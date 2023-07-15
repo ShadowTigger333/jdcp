@@ -1,5 +1,7 @@
+use hex::FromHexError;
+use std::str;
 use nom::{
-    bytes::streaming::{tag, take},
+    bytes::streaming::{tag, take, take_until},
     combinator::map_res,
     IResult,
 };
@@ -22,10 +24,23 @@ fn message_type(i: &str) -> IResult<&str, MessageType> {
     map_res(take(2u8), check_type)(i)
 }
 
-fn hex_message(input: &str) -> IResult<&str, (&str, MessageType)> {
+fn to_str(input: &str) -> Result<Vec<u8>, FromHexError> {
+    hex::decode(input)
+}
+
+fn until_nul(i: &str) -> IResult<&str, &str> {
+    take_until("00")(i)
+}
+
+fn character_name(i: &str) -> IResult<&str, Vec<u8>> {
+    map_res(until_nul, to_str)(i)
+}
+
+fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>)> {
     let (input, found_tag) = tag("jdcp-")(input)?;
     let (input, message_type) = message_type(input)?;
-    Ok((input, (found_tag, message_type)))
+    let (input, character_name) = character_name(input)?;
+    Ok((input, (found_tag, message_type, character_name)))
     // let (input, (message_type, character, info_type, size_data, data)) =
     //     tuple((message_type, character, info_type, size_data, data))(input)?;
 
@@ -46,21 +61,45 @@ mod josh_dnd_character_protocol_message_tests {
     use super::*;
 
     #[test]
-    fn test() {
-        assert!(true)
-    }
-    
-    #[test]
-    fn hex_message_parses_message_type() {
+    fn hex_message_parses_character_name() {
         assert_eq!(
             hex_message("jdcp-AA426172740005000000"),
-            Ok(("426172740005000000", ("jdcp-", MessageType::Request)))
+            Ok((
+                "0005000000",
+                ("jdcp-", MessageType::Request, "Bart".to_owned().into_bytes())
+            ))
         );
+    }
+
+    #[test]
+    fn character_name_returns_actual_name() {
+        let result = character_name("4261727400");
+        assert_eq!(result, Ok(("00", "Bart".to_owned().into_bytes())));
+    }
+
+    // #[test]
+    // fn hex_message_parses_message_type() {
+    //     assert_eq!(
+    //         hex_message("jdcp-AA426172740005000000"),
+    //         Ok(("426172740005000000", ("jdcp-", MessageType::Request)))
+    //     );
+    // }
+
+    #[test]
+    fn message_type_returns_correct_type() {
+        let result = message_type("AAremainder");
+        assert_eq!(result, Ok(("remainder", MessageType::Request)))
     }
 
     #[test]
     fn hex_message_errors_on_incorrect_message_type() {
         let result = hex_message("jdcp-FF426172740005000000");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn hex_message_errors_on_incorrect_tag() {
+        let result = hex_message("abcd-FF426172740005000000");
         assert!(result.is_err());
     }
 
