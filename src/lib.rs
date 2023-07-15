@@ -1,3 +1,4 @@
+use byteorder::{LittleEndian, ReadBytesExt};
 use hex::FromHexError;
 use nom::{
     bytes::streaming::{tag, take, take_until},
@@ -5,7 +6,6 @@ use nom::{
     IResult,
 };
 use std::str;
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt}; 
 
 #[derive(Debug, PartialEq)]
 enum MessageType {
@@ -74,14 +74,29 @@ fn data_size(i: &str) -> IResult<&str, u16> {
     map_res(take(4u8), to_u16)(i)
 }
 
-fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoType, u16)> {
+fn data(i: &str, len: u16) -> IResult<&str, &str> {
+    take(len)(i)
+}
+
+fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoType, u16, &str)> {
     let (input, found_tag) = tag("jdcp-")(input)?;
     let (input, message_type) = message_type(input)?;
     let (input, character_name) = character_name(input)?;
     let (input, _) = tag("00")(input)?;
     let (input, info_type) = info_type(input)?;
     let (input, data_size) = data_size(input)?;
-    Ok((input, (found_tag, message_type, character_name, info_type, data_size)))
+    let (input, data) = data(input, data_size)?;
+    Ok((
+        input,
+        (
+            found_tag,
+            message_type,
+            character_name,
+            info_type,
+            data_size,
+            data
+        ),
+    ))
     // let (input, (message_type, character, info_type, data_size, data)) =
     //     tuple((message_type, character, info_type, data_size, data))(input)?;
 
@@ -112,12 +127,36 @@ mod josh_dnd_character_protocol_message_tests {
                     MessageType::Request,
                     "Bart".to_owned().into_bytes(),
                     InfoType::Level,
-                    0u16
+                    0u16,
+                    "",
                 )
             ))
         );
     }
-    
+
+    #[test]
+    fn data_gets_0_bytes_if_0() {
+        let result = data("remain", 0);
+        assert_eq!(result, Ok(("remain", "")))
+    }
+
+    // #[test]
+    // fn hex_message_parses_data_size() {
+    //     assert_eq!(
+    //         hex_message("jdcp-AA4261727400050000"),
+    //         Ok((
+    //             "",
+    //             (
+    //                 "jdcp-",
+    //                 MessageType::Request,
+    //                 "Bart".to_owned().into_bytes(),
+    //                 InfoType::Level,
+    //                 0u16
+    //             )
+    //         ))
+    //     );
+    // }
+
     #[test]
     fn data_size_returns_correct_values() {
         let result = data_size("0A00remainder");
@@ -155,7 +194,6 @@ mod josh_dnd_character_protocol_message_tests {
         assert_eq!(race, Ok(("remainder4", InfoType::Race)));
         assert_eq!(level, Ok(("remainder5", InfoType::Level)));
         assert_eq!(hp, Ok(("remainder6", InfoType::HP)));
-
     }
 
     // #[test]
