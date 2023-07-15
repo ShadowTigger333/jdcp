@@ -5,6 +5,7 @@ use nom::{
     IResult,
 };
 use std::str;
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt}; 
 
 #[derive(Debug, PartialEq)]
 enum MessageType {
@@ -62,15 +63,27 @@ fn info_type(i: &str) -> IResult<&str, InfoType> {
     map_res(take(2u8), check_info_type)(i)
 }
 
-fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoType)> {
+fn to_u16(input: &str) -> Result<u16, std::io::Error> {
+    let data: Vec<u8> = hex::decode(input).unwrap();
+    let mut current = &data[..];
+
+    current.read_u16::<LittleEndian>()
+}
+
+fn data_size(i: &str) -> IResult<&str, u16> {
+    map_res(take(4u8), to_u16)(i)
+}
+
+fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoType, u16)> {
     let (input, found_tag) = tag("jdcp-")(input)?;
     let (input, message_type) = message_type(input)?;
     let (input, character_name) = character_name(input)?;
     let (input, _) = tag("00")(input)?;
     let (input, info_type) = info_type(input)?;
-    Ok((input, (found_tag, message_type, character_name, info_type)))
-    // let (input, (message_type, character, info_type, size_data, data)) =
-    //     tuple((message_type, character, info_type, size_data, data))(input)?;
+    let (input, data_size) = data_size(input)?;
+    Ok((input, (found_tag, message_type, character_name, info_type, data_size)))
+    // let (input, (message_type, character, info_type, data_size, data)) =
+    //     tuple((message_type, character, info_type, data_size, data))(input)?;
 
     // Ok((
     //     input,
@@ -78,7 +91,7 @@ fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoTy
     //         message_type,
     //         character,
     //         info_type,
-    //         size_data,
+    //         data_size,
     //         data,
     //     },
     // ))
@@ -89,20 +102,43 @@ mod josh_dnd_character_protocol_message_tests {
     use super::*;
 
     #[test]
-    fn hex_message_parses_info_type() {
+    fn hex_message_parses_data_size() {
         assert_eq!(
-            hex_message("jdcp-AA426172740005000000"),
+            hex_message("jdcp-AA4261727400050000"),
             Ok((
-                "000000",
+                "",
                 (
                     "jdcp-",
                     MessageType::Request,
                     "Bart".to_owned().into_bytes(),
-                    InfoType::Level
+                    InfoType::Level,
+                    0u16
                 )
             ))
         );
     }
+    
+    #[test]
+    fn data_size_returns_correct_values() {
+        let result = data_size("0A00remainder");
+        assert_eq!(result, Ok(("remainder", 10u16)))
+    }
+
+    // #[test]
+    // fn hex_message_parses_info_type() {
+    //     assert_eq!(
+    //         hex_message("jdcp-AA426172740005000000"),
+    //         Ok((
+    //             "000000",
+    //             (
+    //                 "jdcp-",
+    //                 MessageType::Request,
+    //                 "Bart".to_owned().into_bytes(),
+    //                 InfoType::Level
+    //             )
+    //         ))
+    //     );
+    // }
 
     #[test]
     fn info_type_returns_correct_types() {
@@ -178,7 +214,7 @@ mod josh_dnd_character_protocol_message_tests {
     // #[ignore = "final test"]
     // fn hex_message_request_level_works() {
     //     assert_eq!(
-    //                 hex_message("jdcp-AA426172740005000000"),
+    //                 hex_message("jdcp-AA4261727400050000"),
     //                 Ok(("", Message {
     //                             message_type: MessageType::Request,
     //                             character: "Bart",
