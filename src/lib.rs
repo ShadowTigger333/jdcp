@@ -1,10 +1,10 @@
 use hex::FromHexError;
-use std::str;
 use nom::{
     bytes::streaming::{tag, take, take_until},
     combinator::map_res,
     IResult,
 };
+use std::str;
 
 #[derive(Debug, PartialEq)]
 enum MessageType {
@@ -12,7 +12,17 @@ enum MessageType {
     Response,
 }
 
-fn check_type(input: &str) -> Result<MessageType, &'static str> {
+#[derive(Debug, PartialEq)]
+enum InfoType {
+    Stats,
+    Age,
+    Class,
+    Race,
+    Level,
+    HP,
+}
+
+fn check_message_type(input: &str) -> Result<MessageType, &'static str> {
     match input {
         "AA" => Ok(MessageType::Request),
         "BB" => Ok(MessageType::Response),
@@ -20,8 +30,20 @@ fn check_type(input: &str) -> Result<MessageType, &'static str> {
     }
 }
 
+fn check_info_type(input: &str) -> Result<InfoType, &'static str> {
+    match input {
+        "01" => Ok(InfoType::Stats),
+        "02" => Ok(InfoType::Age),
+        "03" => Ok(InfoType::Class),
+        "04" => Ok(InfoType::Race),
+        "05" => Ok(InfoType::Level),
+        "06" => Ok(InfoType::HP),
+        _ => return Err("Invalid info type"),
+    }
+}
+
 fn message_type(i: &str) -> IResult<&str, MessageType> {
-    map_res(take(2u8), check_type)(i)
+    map_res(take(2u8), check_message_type)(i)
 }
 
 fn to_str(input: &str) -> Result<Vec<u8>, FromHexError> {
@@ -36,11 +58,17 @@ fn character_name(i: &str) -> IResult<&str, Vec<u8>> {
     map_res(until_nul, to_str)(i)
 }
 
-fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>)> {
+fn info_type(i: &str) -> IResult<&str, InfoType> {
+    map_res(take(2u8), check_info_type)(i)
+}
+
+fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoType)> {
     let (input, found_tag) = tag("jdcp-")(input)?;
     let (input, message_type) = message_type(input)?;
     let (input, character_name) = character_name(input)?;
-    Ok((input, (found_tag, message_type, character_name)))
+    let (input, _) = tag("00")(input)?;
+    let (input, info_type) = info_type(input)?;
+    Ok((input, (found_tag, message_type, character_name, info_type)))
     // let (input, (message_type, character, info_type, size_data, data)) =
     //     tuple((message_type, character, info_type, size_data, data))(input)?;
 
@@ -61,15 +89,49 @@ mod josh_dnd_character_protocol_message_tests {
     use super::*;
 
     #[test]
-    fn hex_message_parses_character_name() {
+    fn hex_message_parses_info_type() {
         assert_eq!(
             hex_message("jdcp-AA426172740005000000"),
             Ok((
-                "0005000000",
-                ("jdcp-", MessageType::Request, "Bart".to_owned().into_bytes())
+                "000000",
+                (
+                    "jdcp-",
+                    MessageType::Request,
+                    "Bart".to_owned().into_bytes(),
+                    InfoType::Level
+                )
             ))
         );
     }
+
+    #[test]
+    fn info_type_returns_correct_types() {
+        let stats = info_type("01remainder1");
+        let age = info_type("02remainder2");
+        let class = info_type("03remainder3");
+        let race = info_type("04remainder4");
+        let level = info_type("05remainder5");
+        let hp = info_type("06remainder6");
+
+        assert_eq!(stats, Ok(("remainder1", InfoType::Stats)));
+        assert_eq!(age, Ok(("remainder2", InfoType::Age)));
+        assert_eq!(class, Ok(("remainder3", InfoType::Class)));
+        assert_eq!(race, Ok(("remainder4", InfoType::Race)));
+        assert_eq!(level, Ok(("remainder5", InfoType::Level)));
+        assert_eq!(hp, Ok(("remainder6", InfoType::HP)));
+
+    }
+
+    // #[test]
+    // fn hex_message_parses_character_name() {
+    //     assert_eq!(
+    //         hex_message("jdcp-AA426172740005000000"),
+    //         Ok((
+    //             "0005000000",
+    //             ("jdcp-", MessageType::Request, "Bart".to_owned().into_bytes())
+    //         ))
+    //     );
+    // }
 
     #[test]
     fn character_name_returns_actual_name() {
