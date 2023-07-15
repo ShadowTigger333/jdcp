@@ -23,6 +23,15 @@ enum InfoType {
     HP,
 }
 
+#[derive(Debug, PartialEq)]
+struct Message<'a> {
+    message_type: MessageType,
+    character_name: Vec<u8>,
+    info_type: InfoType,
+    data_size: u16,
+    data: &'a str,
+}
+
 fn check_message_type(input: &str) -> Result<MessageType, &'static str> {
     match input {
         "AA" => Ok(MessageType::Request),
@@ -78,8 +87,8 @@ fn data(i: &str, len: u16) -> IResult<&str, &str> {
     take(len)(i)
 }
 
-fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoType, u16, &str)> {
-    let (input, found_tag) = tag("jdcp-")(input)?;
+fn hex_message(input: &str) -> IResult<&str, Message> {
+    let (input, _) = tag("jdcp-")(input)?;
     let (input, message_type) = message_type(input)?;
     let (input, character_name) = character_name(input)?;
     let (input, _) = tag("00")(input)?;
@@ -88,14 +97,13 @@ fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoTy
     let (input, data) = data(input, data_size)?;
     Ok((
         input,
-        (
-            found_tag,
+        Message {
             message_type,
             character_name,
             info_type,
             data_size,
             data
-        ),
+        },
     ))
     // let (input, (message_type, character, info_type, data_size, data)) =
     //     tuple((message_type, character, info_type, data_size, data))(input)?;
@@ -116,23 +124,23 @@ fn hex_message(input: &str) -> IResult<&str, (&str, MessageType, Vec<u8>, InfoTy
 mod josh_dnd_character_protocol_message_tests {
     use super::*;
 
-    #[test]
-    fn hex_message_parses_data_size() {
-        assert_eq!(
-            hex_message("jdcp-AA4261727400050000"),
-            Ok((
-                "",
-                (
-                    "jdcp-",
-                    MessageType::Request,
-                    "Bart".to_owned().into_bytes(),
-                    InfoType::Level,
-                    0u16,
-                    "",
-                )
-            ))
-        );
-    }
+    // #[test]
+    // fn hex_message_parses_data() {
+    //     assert_eq!(
+    //         hex_message("jdcp-AA4261727400050000"),
+    //         Ok((
+    //             "",
+    //             (
+    //                 "jdcp-",
+    //                 MessageType::Request,
+    //                 "Bart".to_owned().into_bytes(),
+    //                 InfoType::Level,
+    //                 0u16,
+    //                 "",
+    //             )
+    //         ))
+    //     );
+    // }
 
     #[test]
     fn data_gets_0_bytes_if_0() {
@@ -248,18 +256,17 @@ mod josh_dnd_character_protocol_message_tests {
     //     );
     // }
 
-    // #[test]
-    // #[ignore = "final test"]
-    // fn hex_message_request_level_works() {
-    //     assert_eq!(
-    //                 hex_message("jdcp-AA4261727400050000"),
-    //                 Ok(("", Message {
-    //                             message_type: MessageType::Request,
-    //                             character: "Bart",
-    //                             info_type: InfoType::Level,
-    //                             size_data: 0
-    //                             data: None
-    //                 }))
-    //     );
-    // }
+    #[test]
+    fn hex_message_request_level_works() {
+        assert_eq!(
+                    hex_message("jdcp-AA4261727400050000"),
+                    Ok(("", Message {
+                                message_type: MessageType::Request,
+                                character_name: "Bart".to_owned().into_bytes(),
+                                info_type: InfoType::Level,
+                                data_size: 0,
+                                data: "",
+                    }))
+        );
+    }
 }
