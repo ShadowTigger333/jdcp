@@ -1,3 +1,4 @@
+use byteorder::{LittleEndian, ReadBytesExt};
 use nom::{
     bytes::streaming::{is_a, tag, take},
     character::streaming::alpha1,
@@ -9,44 +10,101 @@ use std::str;
 
 #[derive(Debug, PartialEq)]
 enum MessageType {
-    Request,
-    Response,
+    REQUEST,
+    RESPONSE,
 }
 
 #[derive(Debug, PartialEq)]
 enum InfoType {
-    Stats,
-    Age,
-    Class,
-    Race,
-    Level,
+    STATS,
+    AGE,
+    CLASS,
+    RACE,
+    LEVEL,
     HP,
 }
 
 #[derive(Debug, PartialEq)]
-struct Message<'a> {
+struct HealthPoints {
+    current: u8,
+    max: u8,
+}
+
+#[derive(Debug, PartialEq)]
+enum ClassType {
+    ARTIFACER,
+    BARBARIAN,
+    BARD,
+    BLOODHUNTER,
+    CLERIC,
+    DRUID,
+    FIGHTER,
+    MONK,
+    PALADIN,
+    RANGER,
+    ROGUE,
+    SORCERER,
+    WARLOCK,
+    WIZARD,
+}
+
+#[derive(Debug, PartialEq)]
+enum RaceKind {
+    DWARF,
+    ELF,
+    GNOME,
+    HALFELF,
+    HALFLING,
+    HALFORK,
+    HUMAN,
+    ORC,
+    TIEFLING,
+}
+
+#[derive(Debug, PartialEq)]
+struct StatBlock {
+    strength: u8,
+    dexterity: u8,
+    constitution: u8,
+    intelligence: u8,
+    wisdom: u8,
+    charisma: u8,
+}
+
+#[derive(Debug, PartialEq)]
+enum DataType<'a> {
+    STATS(StatBlock),
+    AGE(u16),
+    CLASS(Result<ClassType, &'a str>),
+    RACE(Result<RaceKind, &'a str>),
+    LEVEL(u8),
+    HP(HealthPoints),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Message<'a> {
     message_type: MessageType,
     character_name: &'a [u8],
     info_type: InfoType,
     data_size: u16,
-    data: &'a [u8],
+    data: Option<DataType<'a>>,
 }
 
 fn check_message_type(input: u8) -> Result<MessageType, &'static str> {
     match input {
-        0xAA => Ok(MessageType::Request),
-        0xBB => Ok(MessageType::Response),
+        0xAA => Ok(MessageType::REQUEST),
+        0xBB => Ok(MessageType::RESPONSE),
         _ => return Err("Invalid message type"),
     }
 }
 
 fn check_info_type(input: u8) -> Result<InfoType, &'static str> {
     match input {
-        1 => Ok(InfoType::Stats),
-        2 => Ok(InfoType::Age),
-        3 => Ok(InfoType::Class),
-        4 => Ok(InfoType::Race),
-        5 => Ok(InfoType::Level),
+        1 => Ok(InfoType::STATS),
+        2 => Ok(InfoType::AGE),
+        3 => Ok(InfoType::CLASS),
+        4 => Ok(InfoType::RACE),
+        5 => Ok(InfoType::LEVEL),
         6 => Ok(InfoType::HP),
         _ => return Err("Invalid info type"),
     }
@@ -68,6 +126,80 @@ fn data_size(i: &[u8]) -> IResult<&[u8], u16> {
     le_u16(i)
 }
 
+fn data_stats(i: &[u8]) -> StatBlock {
+    StatBlock {
+        strength: i[0],
+        dexterity: i[1],
+        constitution: i[2],
+        intelligence: i[3],
+        wisdom: i[4],
+        charisma: i[5],
+    }
+}
+
+fn data_age(i: &[u8]) -> u16 {
+    let mut data = &i[0..2];
+    data.read_u16::<LittleEndian>().unwrap()
+}
+
+fn data_class(i: &[u8]) -> Result<ClassType, &str> {
+    match i[0] {
+        1 => Ok(ClassType::ARTIFACER),
+        2 => Ok(ClassType::BARBARIAN),
+        3 => Ok(ClassType::BARD),
+        4 => Ok(ClassType::BLOODHUNTER),
+        5 => Ok(ClassType::CLERIC),
+        6 => Ok(ClassType::DRUID),
+        7 => Ok(ClassType::FIGHTER),
+        8 => Ok(ClassType::MONK),
+        9 => Ok(ClassType::PALADIN),
+        10 => Ok(ClassType::RANGER),
+        11 => Ok(ClassType::ROGUE),
+        12 => Ok(ClassType::SORCERER),
+        13 => Ok(ClassType::WARLOCK),
+        14 => Ok(ClassType::WIZARD),
+        _ => return Err("Invalid class type"),
+    }
+}
+
+fn data_race(i: &[u8]) -> Result<RaceKind, &str> {
+    match i[0] {
+        1 => Ok(RaceKind::DWARF),
+        2 => Ok(RaceKind::ELF),
+        3 => Ok(RaceKind::GNOME),
+        4 => Ok(RaceKind::HALFELF),
+        5 => Ok(RaceKind::HALFLING),
+        6 => Ok(RaceKind::HALFORK),
+        7 => Ok(RaceKind::HUMAN),
+        8 => Ok(RaceKind::ORC),
+        9 => Ok(RaceKind::TIEFLING),
+        _ => return Err("Invalid race kind"),
+    }
+}
+
+fn data_level(i: &[u8]) -> u8 {
+    i[0]
+}
+
+fn data_hp(i: &[u8]) -> HealthPoints {
+    HealthPoints {
+        current: i[0],
+        max: i[1],
+    }
+}
+
+fn parse_data<'a>(info_type: &InfoType, data: &'a [u8]) -> Option<DataType<'a>> {
+    match info_type {
+        InfoType::STATS => Some(DataType::STATS(data_stats(data))),
+        InfoType::AGE => Some(DataType::AGE(data_age(data))),
+        InfoType::CLASS => Some(DataType::CLASS(data_class(data))),
+        InfoType::RACE => Some(DataType::RACE(data_race(data))),
+        InfoType::LEVEL => Some(DataType::LEVEL(data_level(data))),
+        InfoType::HP => Some(DataType::HP(data_hp(data))),
+        _ => None,
+    }
+}
+
 fn data(i: &[u8], len: u16) -> IResult<&[u8], &[u8]> {
     take(len)(i)
 }
@@ -80,6 +212,13 @@ fn bytes_to_message(input: &[u8]) -> IResult<&[u8], Message> {
     let (input, info_type) = info_type(input)?;
     let (input, data_size) = data_size(input)?;
     let (input, data) = data(input, data_size)?;
+
+    let data: Option<DataType> = if data_size > 0 {
+        parse_data(&info_type, data)
+    } else {
+        None
+    };
+
     Ok((
         input,
         Message {
@@ -103,13 +242,69 @@ mod josh_dnd_character_protocol_message_tests {
             Ok((
                 &b""[..],
                 Message {
-                    message_type: MessageType::Request,
+                    message_type: MessageType::REQUEST,
                     character_name: "Bart".as_bytes(),
-                    info_type: InfoType::Level,
+                    info_type: InfoType::LEVEL,
                     data_size: 0,
-                    data: &b""[..],
+                    data: None,
                 }
             ))
+        );
+    }
+
+    #[test]
+    fn bytes_to_message_request_stats_works() {
+        assert_eq!(
+            bytes_to_message(&b"jdcp-\xAABart\x00\x01\x00\x00"[..]),
+            Ok((
+                &b""[..],
+                Message {
+                    message_type: MessageType::REQUEST,
+                    character_name: "Bart".as_bytes(),
+                    info_type: InfoType::STATS,
+                    data_size: 0,
+                    data: None,
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn bytes_to_message_response_stats_works() {
+        assert_eq!(
+            bytes_to_message(&b"jdcp-\xBBBart\x00\x01\x06\x00\x0C\x12\x12\x10\x0F\x0C"[..]),
+            Ok((
+                &b""[..],
+                Message {
+                    message_type: MessageType::RESPONSE,
+                    character_name: "Bart".as_bytes(),
+                    info_type: InfoType::STATS,
+                    data_size: 6,
+                    data: Some(DataType::STATS(StatBlock {
+                        strength: 12,
+                        dexterity: 18,
+                        constitution: 18,
+                        intelligence: 16,
+                        wisdom: 15,
+                        charisma: 12
+                    })),
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn bytes_to_message_response_level_works() {
+        let expected_message = Message {
+            message_type: MessageType::RESPONSE,
+            character_name: "Bart".as_bytes(),
+            info_type: InfoType::LEVEL,
+            data_size: 1,
+            data: Some(DataType::LEVEL(10)),
+        };
+        assert_eq!(
+            bytes_to_message(&b"jdcp-\xBBBart\x00\x05\x01\x00\x0A"[..]),
+            Ok((&b""[..], expected_message))
         );
     }
 
@@ -134,11 +329,11 @@ mod josh_dnd_character_protocol_message_tests {
         let level = info_type(&b"\x05\xAA"[..]);
         let hp = info_type(&b"\x06\xAA"[..]);
 
-        assert_eq!(stats, Ok((&b"\xAA"[..], InfoType::Stats)));
-        assert_eq!(age, Ok((&b"\xAA"[..], InfoType::Age)));
-        assert_eq!(class, Ok((&b"\xAA"[..], InfoType::Class)));
-        assert_eq!(race, Ok((&b"\xAA"[..], InfoType::Race)));
-        assert_eq!(level, Ok((&b"\xAA"[..], InfoType::Level)));
+        assert_eq!(stats, Ok((&b"\xAA"[..], InfoType::STATS)));
+        assert_eq!(age, Ok((&b"\xAA"[..], InfoType::AGE)));
+        assert_eq!(class, Ok((&b"\xAA"[..], InfoType::CLASS)));
+        assert_eq!(race, Ok((&b"\xAA"[..], InfoType::RACE)));
+        assert_eq!(level, Ok((&b"\xAA"[..], InfoType::LEVEL)));
         assert_eq!(hp, Ok((&b"\xAA"[..], InfoType::HP)));
     }
 
@@ -150,8 +345,10 @@ mod josh_dnd_character_protocol_message_tests {
 
     #[test]
     fn message_type_byte_returns_correct_type() {
-        let result = message_type(&b"\xAA\x12"[..]);
-        assert_eq!(result, Ok((&b"\x12"[..], MessageType::Request)))
+        let request_message = message_type(&b"\xAA\x12"[..]);
+        let response_message = message_type(&b"\xBB\x12"[..]);
+        assert_eq!(request_message, Ok((&b"\x12"[..], MessageType::REQUEST)));
+        assert_eq!(response_message, Ok((&b"\x12"[..], MessageType::RESPONSE)));
     }
 
     #[test]
