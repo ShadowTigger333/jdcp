@@ -1,4 +1,9 @@
+pub mod message;
+
 use byteorder::{LittleEndian, ReadBytesExt};
+use message::{
+    ClassType, DataType, HealthPoints, InfoType, Message, MessageType, RaceKind, StatBlock,
+};
 use nom::{
     bytes::streaming::{is_a, tag, take},
     character::streaming::alpha1,
@@ -7,88 +12,6 @@ use nom::{
     IResult,
 };
 use std::str;
-
-#[derive(Debug, PartialEq)]
-enum MessageType {
-    REQUEST,
-    RESPONSE,
-}
-
-#[derive(Debug, PartialEq)]
-enum InfoType {
-    STATS,
-    AGE,
-    CLASS,
-    RACE,
-    LEVEL,
-    HP,
-}
-
-#[derive(Debug, PartialEq)]
-struct HealthPoints {
-    current: u8,
-    max: u8,
-}
-
-#[derive(Debug, PartialEq)]
-enum ClassType {
-    ARTIFACER,
-    BARBARIAN,
-    BARD,
-    BLOODHUNTER,
-    CLERIC,
-    DRUID,
-    FIGHTER,
-    MONK,
-    PALADIN,
-    RANGER,
-    ROGUE,
-    SORCERER,
-    WARLOCK,
-    WIZARD,
-}
-
-#[derive(Debug, PartialEq)]
-enum RaceKind {
-    DWARF,
-    ELF,
-    GNOME,
-    HALFELF,
-    HALFLING,
-    HALFORK,
-    HUMAN,
-    ORC,
-    TIEFLING,
-}
-
-#[derive(Debug, PartialEq)]
-struct StatBlock {
-    strength: u8,
-    dexterity: u8,
-    constitution: u8,
-    intelligence: u8,
-    wisdom: u8,
-    charisma: u8,
-}
-
-#[derive(Debug, PartialEq)]
-enum DataType<'a> {
-    STATS(StatBlock),
-    AGE(u16),
-    CLASS(Result<ClassType, &'a str>),
-    RACE(Result<RaceKind, &'a str>),
-    LEVEL(u8),
-    HP(HealthPoints),
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Message<'a> {
-    message_type: MessageType,
-    character_name: &'a [u8],
-    info_type: InfoType,
-    data_size: u16,
-    data: Option<DataType<'a>>,
-}
 
 fn check_message_type(input: u8) -> Result<MessageType, &'static str> {
     match input {
