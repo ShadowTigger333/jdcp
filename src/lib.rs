@@ -42,7 +42,7 @@ fn data<'a, 'b, 'c>(
     }
 }
 
-fn decode(input: &[u8]) -> Res<&[u8], Message> {
+fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
     let (input, message_type) = message_type(input)?;
     let (input, character_name) = character_name(input)?;
     let (input, info_type) = info_type(input)?;
@@ -68,9 +68,24 @@ mod josh_dnd_character_protocol_message_tests {
     use super::*;
 
     #[test]
+    fn message_request_level_to_bytes_works() {
+        assert_eq!(
+            &b"jdcp-\xAABart\x00\x05\x00\x00"[..],
+            Message {
+                message_type: MessageType::REQUEST,
+                character_name: "Bart".as_bytes(),
+                info_type: InfoType::LEVEL,
+                data_size: 0,
+                data: None,
+            }
+            .encode_jdcp()
+        )
+    }
+
+    #[test]
     fn bytes_to_message_request_level_works() {
         assert_eq!(
-            decode(&b"jdcp-\xAABart\x00\x05\x00\x00"[..]),
+            decode_jdcp(&b"jdcp-\xAABart\x00\x05\x00\x00"[..]),
             Ok((
                 &b""[..],
                 Message {
@@ -87,7 +102,7 @@ mod josh_dnd_character_protocol_message_tests {
     #[test]
     fn bytes_to_message_request_stats_works() {
         assert_eq!(
-            decode(&b"jdcp-\xAABart\x00\x01\x00\x00"[..]),
+            decode_jdcp(&b"jdcp-\xAABart\x00\x01\x00\x00"[..]),
             Ok((
                 &b""[..],
                 Message {
@@ -102,9 +117,24 @@ mod josh_dnd_character_protocol_message_tests {
     }
 
     #[test]
+    fn message_request_stats_to_bytes_works() {
+        assert_eq!(
+            &b"jdcp-\xAABart\x00\x01\x00\x00"[..],
+            Message {
+                message_type: MessageType::REQUEST,
+                character_name: "Bart".as_bytes(),
+                info_type: InfoType::STATS,
+                data_size: 0,
+                data: None,
+            }
+            .encode_jdcp()
+        )
+    }
+
+    #[test]
     fn bytes_to_message_response_stats_works() {
         assert_eq!(
-            decode(&b"jdcp-\xBBBart\x00\x01\x06\x00\x0C\x12\x12\x10\x0F\x0C"[..]),
+            decode_jdcp(&b"jdcp-\xBBBart\x00\x01\x06\x00\x0C\x12\x12\x10\x0F\x0C"[..]),
             Ok((
                 &b""[..],
                 Message {
@@ -119,6 +149,21 @@ mod josh_dnd_character_protocol_message_tests {
     }
 
     #[test]
+    fn message_response_stats_to_bytes_works() {
+        assert_eq!(
+            &b"jdcp-\xBBBart\x00\x01\x06\x00\x0C\x12\x12\x10\x0F\x0C"[..],
+            Message {
+                message_type: MessageType::RESPONSE,
+                character_name: "Bart".as_bytes(),
+                info_type: InfoType::STATS,
+                data_size: 6,
+                data: Some(DataType::STATS(StatBlock::new(12, 18, 18, 16, 15, 12))),
+            }
+            .encode_jdcp()
+        );
+    }
+
+    #[test]
     fn bytes_to_message_response_level_works() {
         let expected_message = Message {
             message_type: MessageType::RESPONSE,
@@ -128,9 +173,24 @@ mod josh_dnd_character_protocol_message_tests {
             data: Some(DataType::LEVEL(10)),
         };
         assert_eq!(
-            decode(&b"jdcp-\xBBBart\x00\x05\x01\x00\x0A"[..]),
+            decode_jdcp(&b"jdcp-\xBBBart\x00\x05\x01\x00\x0A"[..]),
             Ok((&b""[..], expected_message))
         );
+    }
+
+    #[test]
+    fn message_response_level_to_bytes_works() {
+        let expected_message = Message {
+            message_type: MessageType::RESPONSE,
+            character_name: "Bart".as_bytes(),
+            info_type: InfoType::LEVEL,
+            data_size: 1,
+            data: Some(DataType::LEVEL(10)),
+        };
+        assert_eq!(
+            &b"jdcp-\xBBBart\x00\x05\x01\x00\x0A"[..],
+            expected_message.encode_jdcp()
+        )
     }
 
     #[test]
@@ -172,7 +232,7 @@ mod josh_dnd_character_protocol_message_tests {
 
     #[test]
     fn byte_message_errors_on_incorrect_message_type() {
-        let result = decode(&b"\xFF"[..]);
+        let result = decode_jdcp(&b"\xFF"[..]);
         assert!(result.is_err());
     }
 }
