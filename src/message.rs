@@ -13,8 +13,6 @@ pub struct Message<'a> {
 }
 
 impl Message<'_> {
-    
-
     pub fn encode_jdcp(self: &Self) -> Vec<u8> {
         let message_type_bytes: &[u8] = &[self.message_type.discriminant()];
         let char_bytes: &[u8] = self.character_name;
@@ -23,9 +21,29 @@ impl Message<'_> {
         let mut data_size_bytes = Vec::new();
         data_size_bytes
             .write_u16::<LittleEndian>(self.data_size)
-            .unwrap();
-
-        //TODO: Data needs to be encoded
+            .expect("Could not write data_size");
+        let data_bytes: Vec<u8> = match &self.data {
+            Some(DataType::STATS(char_stats_block)) => [
+                char_stats_block.strength,
+                char_stats_block.dexterity,
+                char_stats_block.constitution,
+                char_stats_block.intelligence,
+                char_stats_block.wisdom,
+                char_stats_block.charisma,
+            ]
+            .to_vec(),
+            Some(DataType::AGE(char_age)) => {
+                let mut age = Vec::new();
+                age.write_u16::<LittleEndian>(*char_age)
+                    .expect("Age not written");
+                return age;
+            }
+            Some(DataType::CLASS(char_class)) => [char_class.discriminant()].to_vec(),
+            Some(DataType::RACE(char_race)) => [char_race.discriminant()].to_vec(),
+            Some(DataType::LEVEL(char_level)) => [*char_level].to_vec(),
+            Some(DataType::HP(char_hp)) => [char_hp.current, char_hp.max].to_vec(),
+            None => Vec::new(),
+        };
 
         [
             b"jdcp-",
@@ -34,6 +52,7 @@ impl Message<'_> {
             null_byte,
             info_type_bytes,
             &data_size_bytes,
+            &data_bytes,
         ]
         .concat()
     }

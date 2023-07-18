@@ -31,12 +31,12 @@ impl DataType {
 
 #[derive(Debug, PartialEq)]
 pub struct StatBlock {
-    strength: u8,
-    dexterity: u8,
-    constitution: u8,
-    intelligence: u8,
-    wisdom: u8,
-    charisma: u8,
+    pub strength: u8,
+    pub dexterity: u8,
+    pub constitution: u8,
+    pub intelligence: u8,
+    pub wisdom: u8,
+    pub charisma: u8,
 }
 
 impl From<&[u8]> for StatBlock {
@@ -67,20 +67,20 @@ impl StatBlock {
 
 #[derive(Debug, PartialEq)]
 pub enum ClassType {
-    ARTIFACER,
-    BARBARIAN,
-    BARD,
-    BLOODHUNTER,
-    CLERIC,
-    DRUID,
-    FIGHTER,
-    MONK,
-    PALADIN,
-    RANGER,
-    ROGUE,
-    SORCERER,
-    WARLOCK,
-    WIZARD,
+    ARTIFACER = 1,
+    BARBARIAN = 2,
+    BARD = 3,
+    BLOODHUNTER = 4,
+    CLERIC = 5,
+    DRUID = 6,
+    FIGHTER = 7,
+    MONK = 8,
+    PALADIN = 9,
+    RANGER = 10,
+    ROGUE = 11,
+    SORCERER = 12,
+    WARLOCK = 13,
+    WIZARD = 14,
 }
 
 impl From<&[u8]> for ClassType {
@@ -105,17 +105,23 @@ impl From<&[u8]> for ClassType {
     }
 }
 
+impl ClassType {
+    pub fn discriminant(&self) -> u8 {
+        unsafe { *(self as *const Self as *const u8) }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum RaceKind {
-    DWARF,
-    ELF,
-    GNOME,
-    HALFELF,
-    HALFLING,
-    HALFORK,
-    HUMAN,
-    ORC,
-    TIEFLING,
+    DWARF = 1,
+    ELF = 2,
+    GNOME = 3,
+    HALFELF = 4,
+    HALFLING = 5,
+    HALFORK = 6,
+    HUMAN = 7,
+    ORC = 8,
+    TIEFLING = 9,
 }
 
 impl From<&[u8]> for RaceKind {
@@ -135,10 +141,16 @@ impl From<&[u8]> for RaceKind {
     }
 }
 
+impl RaceKind {
+    pub fn discriminant(&self) -> u8 {
+        unsafe { *(self as *const Self as *const u8) }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct HealthPoints {
-    current: u8,
-    max: u8,
+    pub current: u8,
+    pub max: u8,
 }
 
 impl From<&[u8]> for HealthPoints {
