@@ -9,6 +9,7 @@ use nom::{
     sequence::{preceded, terminated},
     IResult,
 };
+use std::str;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -17,8 +18,13 @@ fn message_type(i: &[u8]) -> Res<&[u8], MessageType> {
         .map(|(i, result)| (i, result.into()))
 }
 
-fn character_name(i: &[u8]) -> Res<&[u8], &[u8]> {
-    context("character_name", terminated(alpha1, is_a(&b"\x00"[..])))(i)
+fn character_name(i: &[u8]) -> Res<&[u8], &str> {
+    context("character_name", terminated(alpha1, is_a(&b"\x00"[..])))(i).map(|(i, result)| {
+        (
+            i,
+            str::from_utf8(result).expect("Error reading character name"),
+        )
+    })
 }
 
 fn info_type(i: &[u8]) -> Res<&[u8], InfoType> {
@@ -42,7 +48,7 @@ fn data<'a, 'b, 'c>(
     }
 }
 
-fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
+pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
     let (input, message_type) = message_type(input)?;
     let (input, character_name) = character_name(input)?;
     let (input, info_type) = info_type(input)?;
@@ -73,7 +79,7 @@ mod josh_dnd_character_protocol_message_tests {
             &b"jdcp-\xAABart\x00\x05\x00\x00"[..],
             Message {
                 message_type: MessageType::REQUEST,
-                character_name: "Bart".as_bytes(),
+                character_name: "Bart",
                 info_type: InfoType::LEVEL,
                 data_size: 0,
                 data: None,
@@ -90,7 +96,7 @@ mod josh_dnd_character_protocol_message_tests {
                 &b""[..],
                 Message {
                     message_type: MessageType::REQUEST,
-                    character_name: "Bart".as_bytes(),
+                    character_name: "Bart",
                     info_type: InfoType::LEVEL,
                     data_size: 0,
                     data: None,
@@ -107,7 +113,7 @@ mod josh_dnd_character_protocol_message_tests {
                 &b""[..],
                 Message {
                     message_type: MessageType::REQUEST,
-                    character_name: "Bart".as_bytes(),
+                    character_name: "Bart",
                     info_type: InfoType::STATS,
                     data_size: 0,
                     data: None,
@@ -122,7 +128,7 @@ mod josh_dnd_character_protocol_message_tests {
             &b"jdcp-\xAABart\x00\x01\x00\x00"[..],
             Message {
                 message_type: MessageType::REQUEST,
-                character_name: "Bart".as_bytes(),
+                character_name: "Bart",
                 info_type: InfoType::STATS,
                 data_size: 0,
                 data: None,
@@ -139,7 +145,7 @@ mod josh_dnd_character_protocol_message_tests {
                 &b""[..],
                 Message {
                     message_type: MessageType::RESPONSE,
-                    character_name: "Bart".as_bytes(),
+                    character_name: "Bart",
                     info_type: InfoType::STATS,
                     data_size: 6,
                     data: Some(DataType::STATS(StatBlock::new(12, 18, 18, 16, 15, 12))),
@@ -154,7 +160,7 @@ mod josh_dnd_character_protocol_message_tests {
             &b"jdcp-\xBBBart\x00\x01\x06\x00\x0C\x12\x12\x10\x0F\x0C"[..],
             Message {
                 message_type: MessageType::RESPONSE,
-                character_name: "Bart".as_bytes(),
+                character_name: "Bart",
                 info_type: InfoType::STATS,
                 data_size: 6,
                 data: Some(DataType::STATS(StatBlock::new(12, 18, 18, 16, 15, 12))),
@@ -167,7 +173,7 @@ mod josh_dnd_character_protocol_message_tests {
     fn bytes_to_message_response_level_works() {
         let expected_message = Message {
             message_type: MessageType::RESPONSE,
-            character_name: "Bart".as_bytes(),
+            character_name: "Bart",
             info_type: InfoType::LEVEL,
             data_size: 1,
             data: Some(DataType::LEVEL(10)),
@@ -182,7 +188,7 @@ mod josh_dnd_character_protocol_message_tests {
     fn message_response_level_to_bytes_works() {
         let expected_message = Message {
             message_type: MessageType::RESPONSE,
-            character_name: "Bart".as_bytes(),
+            character_name: "Bart",
             info_type: InfoType::LEVEL,
             data_size: 1,
             data: Some(DataType::LEVEL(10)),
@@ -219,7 +225,7 @@ mod josh_dnd_character_protocol_message_tests {
     #[test]
     fn character_name_bytes_returns_actual_name() {
         let result = character_name(&b"\x42\x61\x72\x74\x00\x01"[..]);
-        assert_eq!(result, Ok((&b"\x01"[..], "Bart".as_bytes())));
+        assert_eq!(result, Ok((&b"\x01"[..], "Bart")));
     }
 
     #[test]

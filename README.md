@@ -14,3 +14,12 @@ I'm trying to learn a lot and jumping back and forth diving into the "Rustian" w
 #### Thoughts
 * While the compiler complains a lot, it's actually reasonably helpful. It's been a minute since I worked in C, but I definitely feel good so far
 * Lifetimes make sense theoretically as I read about them; however, I will need more practice to better understand them experientially. 
+
+## How to use the client<>server
+```bash
+#Server
+cargo run --bin server -- 12345
+
+#Client
+cargo run --bin client
+```

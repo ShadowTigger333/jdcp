@@ -6,7 +6,7 @@ pub use data::*;
 #[derive(Debug, PartialEq)]
 pub struct Message<'a> {
     pub message_type: MessageType,
-    pub character_name: &'a [u8],
+    pub character_name: &'a str,
     pub info_type: InfoType,
     pub data_size: u16,
     pub data: Option<DataType>,
@@ -15,7 +15,7 @@ pub struct Message<'a> {
 impl Message<'_> {
     pub fn encode_jdcp(self: &Self) -> Vec<u8> {
         let message_type_bytes: &[u8] = &[self.message_type.discriminant()];
-        let char_bytes: &[u8] = self.character_name;
+        let char_bytes: &str = self.character_name;
         let null_byte: &[u8] = b"\x00";
         let info_type_bytes: &[u8] = &[self.info_type.discriminant()];
         let mut data_size_bytes = Vec::new();
@@ -48,7 +48,7 @@ impl Message<'_> {
         [
             b"jdcp-",
             message_type_bytes,
-            char_bytes,
+            char_bytes.as_bytes(),
             null_byte,
             info_type_bytes,
             &data_size_bytes,
@@ -109,5 +109,33 @@ impl From<&[u8]> for InfoType {
             Some(6) => InfoType::HP,
             _ => unimplemented!("No other info_types currently"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nom::AsBytes;
+
+    use crate::decode_jdcp;
+
+    use super::*;
+
+    #[test]
+    fn back_and_forth_conversion() {
+        let first_message = Message {
+            message_type: MessageType::RESPONSE,
+            character_name: "Bart",
+            info_type: InfoType::HP,
+            data_size: 2,
+            data: Some(DataType::HP(HealthPoints {
+                current: 34,
+                max: 42,
+            })),
+        };
+        let msg_vec = first_message.encode_jdcp();
+        let buff = msg_vec.as_bytes();
+        let result_message = decode_jdcp(&buff).unwrap().1;
+
+        assert_eq!(first_message, result_message)
     }
 }
