@@ -1,7 +1,3 @@
-use byteorder::{LittleEndian, ReadBytesExt};
-
-use super::InfoType;
-
 #[derive(Debug, PartialEq)]
 pub enum DataType {
     STATS(StatBlock),
@@ -10,23 +6,6 @@ pub enum DataType {
     RACE(RaceKind),
     LEVEL(u8),
     HP(HealthPoints),
-}
-
-impl DataType {
-    pub fn parse(value: &[u8], info_type: &InfoType) -> Self {
-        fn data_age(i: &[u8]) -> u16 {
-            let mut data = &i[0..2];
-            data.read_u16::<LittleEndian>().expect("Age not read")
-        }
-        match info_type {
-            InfoType::STATS => DataType::STATS(value.into()),
-            InfoType::AGE => DataType::AGE(data_age(value)),
-            InfoType::CLASS => DataType::CLASS(value.into()),
-            InfoType::RACE => DataType::RACE(value.into()),
-            InfoType::LEVEL => DataType::LEVEL(value[0]),
-            InfoType::HP => DataType::HP(value.into()),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq)]

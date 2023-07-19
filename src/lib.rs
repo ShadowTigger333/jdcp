@@ -5,7 +5,7 @@ use nom::{
     bytes::streaming::{is_a, tag, take},
     character::streaming::alpha1,
     error::{context, VerboseError},
-    number::streaming::le_u16,
+    number::streaming::{le_u16, u8},
     sequence::{preceded, terminated},
     IResult,
 };
@@ -35,16 +35,47 @@ fn data_size(i: &[u8]) -> Res<&[u8], u16> {
     context("data_size", le_u16)(i)
 }
 
+fn data_stats(i: &[u8]) -> Res<&[u8], Option<DataType>> {
+    context("Info Type Stats", take(6u8))(i)
+        .map(|(i, result)| (i, Some(DataType::STATS(result.into()))))
+}
+
+fn data_age(i: &[u8]) -> Res<&[u8], Option<DataType>> {
+    context("Info Type Age", le_u16)(i).map(|(i, result)| (i, Some(DataType::AGE(result.into()))))
+}
+
+fn data_class(i: &[u8]) -> Res<&[u8], Option<DataType>> {
+    context("Info Type Class", take(1u8))(i)
+        .map(|(i, result)| (i, Some(DataType::CLASS(result.into()))))
+}
+fn data_race(i: &[u8]) -> Res<&[u8], Option<DataType>> {
+    context("Info Type Race", take(1u8))(i)
+        .map(|(i, result)| (i, Some(DataType::RACE(result.into()))))
+}
+fn data_level(i: &[u8]) -> Res<&[u8], Option<DataType>> {
+    context("Info Type Level", u8)(i).map(|(i, result)| (i, Some(DataType::LEVEL(result.into()))))
+}
+
+fn data_hp(i: &[u8]) -> Res<&[u8], Option<DataType>> {
+    context("Info Type HP", take(2u8))(i).map(|(i, result)| (i, Some(DataType::HP(result.into()))))
+}
+
 fn data<'a, 'b, 'c>(
     i: &'a [u8],
     len: &'b u16,
     data_type: &'c InfoType,
 ) -> Res<&'a [u8], Option<DataType>> {
-    if *len > 0 {
-        context("data", take(*len))(i)
-            .map(|(i, result)| (i, Some(DataType::parse(result, data_type))))
-    } else {
+    if *len == 0 {
         Res::from(Ok((i, None)))
+    } else {
+        match *data_type {
+            InfoType::STATS => data_stats(i), //len needs to be 6
+            InfoType::AGE => data_age(i),     //len needs to be 2
+            InfoType::CLASS => data_class(i), //len needs to be 1
+            InfoType::RACE => data_race(i),   //len needs to be 1
+            InfoType::LEVEL => data_level(i), //len needs to be 1
+            InfoType::HP => data_hp(i),       //len needs to be 2
+        }
     }
 }
 
@@ -69,9 +100,10 @@ pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
 
 #[cfg(test)]
 mod josh_dnd_character_protocol_message_tests {
-    use crate::message::StatBlock;
-
     use super::*;
+    use crate::message::StatBlock;
+    use nom::Err::Incomplete;
+    use nom::Needed;
 
     #[test]
     fn message_request_level_to_bytes_works() {
@@ -197,6 +229,22 @@ mod josh_dnd_character_protocol_message_tests {
             &b"jdcp-\xBBBart\x00\x05\x01\x00\x0A"[..],
             expected_message.encode_jdcp()
         )
+    }
+
+    #[test]
+    fn data_cond_works() {
+        let result = data(&b"\x0A\x00\xAA"[..], &2u16, &InfoType::AGE);
+        assert_eq!(result, Ok((&b"\xAA"[..], Some(DataType::AGE(10)))))
+    }
+    #[test]
+    fn data_cond_shows_incomplete_when_not_enough_data_1() {
+        let result = data(&b"\x0A"[..], &2u16, &InfoType::AGE);
+        assert_eq!(result, Err(Incomplete(Needed::new(1))))
+    }
+    #[test]
+    fn data_cond_shows_incomplete_when_not_enough_data_2() {
+        let result = data(&b"\x0A"[..], &6u16, &InfoType::STATS);
+        assert_eq!(result, Err(Incomplete(Needed::new(5))))
     }
 
     #[test]
