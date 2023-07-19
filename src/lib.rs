@@ -4,9 +4,10 @@ use message::{DataType, InfoType, Message, MessageType};
 use nom::{
     bytes::streaming::{is_a, tag, take},
     character::streaming::alpha1,
-    error::{context, VerboseError},
+    error::{context, VerboseError, VerboseErrorKind},
     number::streaming::{le_u16, u8},
     sequence::{preceded, terminated},
+    Err::Failure,
     IResult,
 };
 use std::str;
@@ -59,6 +60,16 @@ fn data_level(i: &[u8]) -> Res<&[u8], Option<DataType>> {
 fn data_hp(i: &[u8]) -> Res<&[u8], Option<DataType>> {
     context("Info Type HP", take(2u8))(i).map(|(i, result)| (i, Some(DataType::HP(result.into()))))
 }
+fn data_lenth_inconsitant_error(
+    i: &[u8],
+) -> Result<(&[u8], Option<DataType>), nom::Err<VerboseError<&[u8]>>> {
+    Err(Failure(VerboseError {
+        errors: vec![(
+            i,
+            VerboseErrorKind::Context("Data length inconsistent with Data Type"),
+        )],
+    }))
+}
 
 fn data<'a, 'b, 'c>(
     i: &'a [u8],
@@ -69,12 +80,48 @@ fn data<'a, 'b, 'c>(
         Res::from(Ok((i, None)))
     } else {
         match *data_type {
-            InfoType::STATS => data_stats(i), //len needs to be 6
-            InfoType::AGE => data_age(i),     //len needs to be 2
-            InfoType::CLASS => data_class(i), //len needs to be 1
-            InfoType::RACE => data_race(i),   //len needs to be 1
-            InfoType::LEVEL => data_level(i), //len needs to be 1
-            InfoType::HP => data_hp(i),       //len needs to be 2
+            InfoType::STATS => {
+                if *len == 6 {
+                    data_stats(i) //len needs to be 6
+                } else {
+                    data_lenth_inconsitant_error(i)
+                }
+            }
+            InfoType::AGE => {
+                if *len == 2 {
+                    data_age(i) //len needs to be 2
+                } else {
+                    data_lenth_inconsitant_error(i)
+                }
+            }
+            InfoType::CLASS => {
+                if *len == 1 {
+                    data_class(i) //len needs to be 1
+                } else {
+                    data_lenth_inconsitant_error(i)
+                }
+            }
+            InfoType::RACE => {
+                if *len == 1 {
+                    data_race(i) //len needs to be 1
+                } else {
+                    data_lenth_inconsitant_error(i)
+                }
+            }
+            InfoType::LEVEL => {
+                if *len == 1 {
+                    data_level(i) //len needs to be 1
+                } else {
+                    data_lenth_inconsitant_error(i)
+                }
+            }
+            InfoType::HP => {
+                if *len == 2 {
+                    data_hp(i) //len needs to be 2
+                } else {
+                    data_lenth_inconsitant_error(i)
+                }
+            }
         }
     }
 }
@@ -102,7 +149,7 @@ pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
 mod josh_dnd_character_protocol_message_tests {
     use super::*;
     use crate::message::StatBlock;
-    use nom::Err::Incomplete;
+    use nom::Err::{Failure, Incomplete};
     use nom::Needed;
 
     #[test]
@@ -184,6 +231,19 @@ mod josh_dnd_character_protocol_message_tests {
                 }
             ))
         );
+    }
+
+    #[test]
+    fn bytes_to_message_response_stats_error_works() {
+        assert_eq!(
+            decode_jdcp(&b"jdcp-\xBBBart\x00\x01\x06\xA0\x0C\x12\x12\x10\x0F\x0C"[..]),
+            Err(Failure(VerboseError {
+                errors: vec![(
+                    &b"\x0C\x12\x12\x10\x0F\x0C"[..],
+                    VerboseErrorKind::Context("Data length inconsistent with Data Type")
+                )]
+            }))
+        )
     }
 
     #[test]
