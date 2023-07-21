@@ -14,7 +14,7 @@ I'm trying to learn a lot and jumping back and forth diving into the "Rustian" w
 #### Thoughts
 * While the compiler complains a lot, it's actually reasonably helpful. It's been a minute since I worked in C, but I definitely feel good so far
 * Lifetimes make sense theoretically as I read about them; however, I will need more practice to better understand them experientially.
-* Nom's cond parser seems like it could be powerful, but I think I'm missing a key part of how to conditionally map decoding data based on both the length and type variables. It returns a successful run of the "parser" so the Alt tag doesn't pair well with it.
+* ~~Nom's cond parser seems like it could be powerful, but I think I'm missing a key part of how to conditionally map decoding data based on both the length and type variables. It returns a successful run of the "parser" so the Alt tag doesn't pair well with it.~~ Update: I am using a combination of the tuple and validate parsers to do this now.
 
 ## How to use the client<>server
 ```bash
