@@ -37,29 +37,26 @@ fn data_size(i: &[u8]) -> Res<&[u8], u16> {
     context("data_size", le_u16)(i)
 }
 
-fn data_stats(i: &[u8]) -> Res<&[u8], Option<DataType>> {
-    context("Info Type Stats", take(6u8))(i)
-        .map(|(i, result)| (i, Some(DataType::STATS(result.into()))))
+fn data_stats(i: &[u8]) -> Res<&[u8], DataType> {
+    context("Info Type Stats", take(6u8))(i).map(|(i, result)| (i, DataType::STATS(result.into())))
 }
 
-fn data_age(i: &[u8]) -> Res<&[u8], Option<DataType>> {
-    context("Info Type Age", le_u16)(i).map(|(i, result)| (i, Some(DataType::AGE(result.into()))))
+fn data_age(i: &[u8]) -> Res<&[u8], DataType> {
+    context("Info Type Age", le_u16)(i).map(|(i, result)| (i, DataType::AGE(result.into())))
 }
 
-fn data_class(i: &[u8]) -> Res<&[u8], Option<DataType>> {
-    context("Info Type Class", take(1u8))(i)
-        .map(|(i, result)| (i, Some(DataType::CLASS(result.into()))))
+fn data_class(i: &[u8]) -> Res<&[u8], DataType> {
+    context("Info Type Class", take(1u8))(i).map(|(i, result)| (i, DataType::CLASS(result.into())))
 }
-fn data_race(i: &[u8]) -> Res<&[u8], Option<DataType>> {
-    context("Info Type Race", take(1u8))(i)
-        .map(|(i, result)| (i, Some(DataType::RACE(result.into()))))
+fn data_race(i: &[u8]) -> Res<&[u8], DataType> {
+    context("Info Type Race", take(1u8))(i).map(|(i, result)| (i, DataType::RACE(result.into())))
 }
-fn data_level(i: &[u8]) -> Res<&[u8], Option<DataType>> {
-    context("Info Type Level", u8)(i).map(|(i, result)| (i, Some(DataType::LEVEL(result.into()))))
+fn data_level(i: &[u8]) -> Res<&[u8], DataType> {
+    context("Info Type Level", u8)(i).map(|(i, result)| (i, DataType::LEVEL(result.into())))
 }
 
-fn data_hp(i: &[u8]) -> Res<&[u8], Option<DataType>> {
-    context("Info Type HP", take(2u8))(i).map(|(i, result)| (i, Some(DataType::HP(result.into()))))
+fn data_hp(i: &[u8]) -> Res<&[u8], DataType> {
+    context("Info Type HP", take(2u8))(i).map(|(i, result)| (i, DataType::HP(result.into())))
 }
 
 //TODO: Not sure how to cleanly throw custom errors when something doesn't parse correctly (Ex: when the alt tag fails in the data parser)
@@ -124,7 +121,7 @@ fn parse_stats_response(input: &[u8]) -> Res<&[u8], MessageData> {
             MessageData {
                 info_type: response.0,
                 data_size: response.1,
-                data: response.2,
+                data: Some(response.2),
             },
         )
     })
@@ -145,7 +142,7 @@ fn parse_age_response(input: &[u8]) -> Res<&[u8], MessageData> {
             MessageData {
                 info_type: response.0,
                 data_size: response.1,
-                data: response.2,
+                data: Some(response.2),
             },
         )
     })
@@ -166,7 +163,7 @@ fn parse_class_response(input: &[u8]) -> Res<&[u8], MessageData> {
             MessageData {
                 info_type: response.0,
                 data_size: response.1,
-                data: response.2,
+                data: Some(response.2),
             },
         )
     })
@@ -187,7 +184,7 @@ fn parse_race_response(input: &[u8]) -> Res<&[u8], MessageData> {
             MessageData {
                 info_type: response.0,
                 data_size: response.1,
-                data: response.2,
+                data: Some(response.2),
             },
         )
     })
@@ -208,7 +205,7 @@ fn parse_level_response(input: &[u8]) -> Res<&[u8], MessageData> {
             MessageData {
                 info_type: response.0,
                 data_size: response.1,
-                data: response.2,
+                data: Some(response.2),
             },
         )
     })
@@ -229,7 +226,7 @@ fn parse_hp_response(input: &[u8]) -> Res<&[u8], MessageData> {
             MessageData {
                 info_type: response.0,
                 data_size: response.1,
-                data: response.2,
+                data: Some(response.2),
             },
         )
     })
