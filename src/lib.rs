@@ -1,7 +1,8 @@
 pub mod message;
 
-use message::{DataType, InfoType, Message, MessageType, ResponseData};
+use message::{DataType, InfoType, Message, MessageData, MessageType};
 use nom::{
+    branch::alt,
     bytes::streaming::{is_a, tag, take},
     character::streaming::alpha1,
     combinator::verify,
@@ -61,85 +62,172 @@ fn data_level(i: &[u8]) -> Res<&[u8], Option<DataType>> {
 fn data_hp(i: &[u8]) -> Res<&[u8], Option<DataType>> {
     context("Info Type HP", take(2u8))(i).map(|(i, result)| (i, Some(DataType::HP(result.into()))))
 }
-fn data_lenth_inconsitant_error(
-    i: &[u8],
-) -> Result<(&[u8], Option<DataType>), nom::Err<VerboseError<&[u8]>>> {
-    Err(Failure(VerboseError {
-        errors: vec![(
-            i,
-            VerboseErrorKind::Context("Data length inconsistent with Data Type"),
-        )],
-    }))
-}
 
-fn data<'a, 'b, 'c>(
-    i: &'a [u8],
-    len: &'b u16,
-    data_type: &'c InfoType,
-) -> Res<&'a [u8], Option<DataType>> {
-    if *len == 0 {
-        Res::from(Ok((i, None)))
+//TODO: Not sure how to cleanly throw custom errors when something doesn't parse correctly (Ex: when the alt tag fails in the data parser)
+// fn data_lenth_inconsitant_error(
+//     i: &[u8],
+// ) -> Result<(&[u8], Option<DataType>), nom::Err<VerboseError<&[u8]>>> {
+//     Err(Failure(VerboseError {
+//         errors: vec![(
+//             i,
+//             VerboseErrorKind::Context("Data length inconsistent with Data Type"),
+//         )],
+//     }))
+// }
+
+fn data<'a, 'b>(i: &'a [u8], message_type: &'b MessageType) -> Res<&'a [u8], MessageData> {
+    if *message_type == MessageType::REQUEST {
+        parse_request(i)
     } else {
-        match *data_type {
-            InfoType::STATS => {
-                if *len == 6 {
-                    data_stats(i) //len needs to be 6
-                } else {
-                    data_lenth_inconsitant_error(i)
-                }
-            }
-            InfoType::AGE => {
-                if *len == 2 {
-                    data_age(i) //len needs to be 2
-                } else {
-                    data_lenth_inconsitant_error(i)
-                }
-            }
-            InfoType::CLASS => {
-                if *len == 1 {
-                    data_class(i) //len needs to be 1
-                } else {
-                    data_lenth_inconsitant_error(i)
-                }
-            }
-            InfoType::RACE => {
-                if *len == 1 {
-                    data_race(i) //len needs to be 1
-                } else {
-                    data_lenth_inconsitant_error(i)
-                }
-            }
-            InfoType::LEVEL => {
-                if *len == 1 {
-                    data_level(i) //len needs to be 1
-                } else {
-                    data_lenth_inconsitant_error(i)
-                }
-            }
-            InfoType::HP => {
-                if *len == 2 {
-                    data_hp(i) //len needs to be 2
-                } else {
-                    data_lenth_inconsitant_error(i)
-                }
-            }
-        }
+        context(
+            "Parse Response",
+            alt((
+                parse_stats_response,
+                parse_age_response,
+                parse_class_response,
+                parse_race_response,
+                parse_level_response,
+                parse_hp_response,
+            )),
+        )(i)
     }
 }
 
-fn parse_stats_response(input: &[u8]) -> Res<&[u8], ResponseData> {
+fn parse_request(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Request",
+        tuple((info_type, verify(data_size, |size: &u16| *size == 0))),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: None,
+            },
+        )
+    })
+}
+
+fn parse_stats_response(input: &[u8]) -> Res<&[u8], MessageData> {
     context(
         "Stats Response",
         tuple((
             verify(info_type, |info: &InfoType| *info == InfoType::STATS),
-            verify(le_u16, |size: &u16| *size == 6),
+            verify(data_size, |size: &u16| *size == 6),
             data_stats,
         )),
     )(input)
     .map(|(input, response)| {
         (
             input,
-            ResponseData {
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: response.2,
+            },
+        )
+    })
+}
+
+fn parse_age_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Age Response",
+        tuple((
+            verify(info_type, |info: &InfoType| *info == InfoType::AGE),
+            verify(data_size, |size: &u16| *size == 2),
+            data_age,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: response.2,
+            },
+        )
+    })
+}
+
+fn parse_class_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Class Response",
+        tuple((
+            verify(info_type, |info: &InfoType| *info == InfoType::CLASS),
+            verify(data_size, |size: &u16| *size == 1),
+            data_class,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: response.2,
+            },
+        )
+    })
+}
+
+fn parse_race_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Race Response",
+        tuple((
+            verify(info_type, |info: &InfoType| *info == InfoType::RACE),
+            verify(data_size, |size: &u16| *size == 1),
+            data_race,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: response.2,
+            },
+        )
+    })
+}
+
+fn parse_level_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Level Response",
+        tuple((
+            verify(info_type, |info: &InfoType| *info == InfoType::LEVEL),
+            verify(data_size, |size: &u16| *size == 1),
+            data_level,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: response.2,
+            },
+        )
+    })
+}
+
+fn parse_hp_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "HP Response",
+        tuple((
+            verify(info_type, |info: &InfoType| *info == InfoType::HP),
+            verify(data_size, |size: &u16| *size == 2),
+            data_hp,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
                 info_type: response.0,
                 data_size: response.1,
                 data: response.2,
@@ -151,22 +239,15 @@ fn parse_stats_response(input: &[u8]) -> Res<&[u8], ResponseData> {
 pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
     let (input, message_type) = message_type(input)?;
     let (input, character_name) = character_name(input)?;
-    let (input, info_type) = info_type(input)?;
-    let (input, data_size) = data_size(input)?;
-    let (input, data) = data(input, &data_size, &info_type)?;
-
-    let i = 1;
-    if i == 2 {
-        let _ = parse_stats_response(input);
-    }
+    let (input, message_data) = data(input, &message_type)?;
     Ok((
         input,
         Message {
             message_type,
             character_name,
-            info_type,
-            data_size,
-            data,
+            info_type: message_data.info_type,
+            data_size: message_data.data_size,
+            data: message_data.data,
         },
     ))
 }
@@ -174,15 +255,16 @@ pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
 #[cfg(test)]
 mod josh_dnd_character_protocol_message_tests {
     use super::*;
-    use crate::message::StatBlock;
-    use nom::Err::{Failure, Incomplete};
-    use nom::Needed;
+    use crate::message::{ClassType, HealthPoints, RaceKind, StatBlock};
+    use nom::error::ErrorKind;
+    use nom::error::VerboseErrorKind::{Context, Nom};
+    use nom::Err::Error;
 
     #[test]
     fn data_type_stats_parser_works_independantly() {
         let incoming_bytes = &b"\x01\x06\x00\x08\x0c\x13\x0e\x10\x09"[..];
         let expected_remainder = &b""[..];
-        let expected_result = ResponseData {
+        let expected_result = MessageData {
             info_type: InfoType::STATS,
             data_size: 6u16,
             data: Some(DataType::STATS(StatBlock {
@@ -202,24 +284,82 @@ mod josh_dnd_character_protocol_message_tests {
     }
 
     #[test]
-    fn todo_data_type_age_parser_works_independantly() {
-        assert!(false)
+    fn data_type_age_parser_works_independantly() {
+        let incoming_bytes = &b"\x02\x02\x00\x00\xA0"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::AGE,
+            data_size: 2u16,
+            data: Some(DataType::AGE(0xA000)),
+        };
+
+        assert_eq!(
+            parse_age_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
     }
     #[test]
-    fn todo_data_type_class_parser_works_independantly() {
-        assert!(false)
+    fn data_type_class_parser_works_independantly() {
+        let incoming_bytes = &b"\x03\x01\x00\x03"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::CLASS,
+            data_size: 1u16,
+            data: Some(DataType::CLASS(ClassType::BARD)),
+        };
+
+        assert_eq!(
+            parse_class_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
     }
     #[test]
-    fn todo_data_type_race_parser_works_independantly() {
-        assert!(false)
+    fn data_type_race_parser_works_independantly() {
+        let incoming_bytes = &b"\x04\x01\x00\x04"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::RACE,
+            data_size: 1u16,
+            data: Some(DataType::RACE(RaceKind::HALFELF)),
+        };
+
+        assert_eq!(
+            parse_race_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
     }
     #[test]
-    fn todo_data_type_level_parser_works_independantly() {
-        assert!(false)
+    fn data_type_level_parser_works_independantly() {
+        let incoming_bytes = &b"\x05\x01\x00\x12"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::LEVEL,
+            data_size: 1u16,
+            data: Some(DataType::LEVEL(0x12)),
+        };
+
+        assert_eq!(
+            parse_level_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
     }
     #[test]
-    fn todo_data_type_hp_parser_works_independantly() {
-        assert!(false)
+    fn data_type_hp_parser_works_independantly() {
+        let incoming_bytes = &b"\x06\x02\x00\x22\x25"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::HP,
+            data_size: 2u16,
+            data: Some(DataType::HP(HealthPoints {
+                current: 0x22,
+                max: 0x25,
+            })),
+        };
+
+        assert_eq!(
+            parse_hp_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
     }
 
     #[test]
@@ -307,11 +447,25 @@ mod josh_dnd_character_protocol_message_tests {
     fn bytes_to_message_response_stats_error_works() {
         assert_eq!(
             decode_jdcp(&b"jdcp-\xBBBart\x00\x01\x06\xA0\x0C\x12\x12\x10\x0F\x0C"[..]),
-            Err(Failure(VerboseError {
-                errors: vec![(
-                    &b"\x0C\x12\x12\x10\x0F\x0C"[..],
-                    VerboseErrorKind::Context("Data length inconsistent with Data Type")
-                )]
+            Err(Error(VerboseError {
+                errors: vec![
+                    (
+                        &b"\x01\x06\xA0\x0C\x12\x12\x10\x0F\x0C"[..],
+                        Nom(ErrorKind::Verify)
+                    ),
+                    (
+                        &b"\x01\x06\xA0\x0C\x12\x12\x10\x0F\x0C"[..],
+                        Context("HP Response")
+                    ),
+                    (
+                        &b"\x01\x06\xA0\x0C\x12\x12\x10\x0F\x0C"[..],
+                        Nom(ErrorKind::Alt)
+                    ),
+                    (
+                        &b"\x01\x06\xA0\x0C\x12\x12\x10\x0F\x0C"[..],
+                        Context("Parse Response")
+                    )
+                ]
             }))
         )
     }
@@ -362,19 +516,27 @@ mod josh_dnd_character_protocol_message_tests {
     }
 
     #[test]
-    fn data_cond_works() {
-        let result = data(&b"\x0A\x00\xAA"[..], &2u16, &InfoType::AGE);
-        assert_eq!(result, Ok((&b"\xAA"[..], Some(DataType::AGE(10)))))
+    fn data_request_works() {
+        let expected_result = MessageData {
+            info_type: InfoType::AGE,
+            data_size: 0,
+            data: None,
+        };
+        let result = data(&b"\x02\x00\x00\xAA"[..], &MessageType::REQUEST);
+        assert_eq!(result, Ok((&b"\xAA"[..], expected_result)))
     }
     #[test]
-    fn data_cond_shows_incomplete_when_not_enough_data_1() {
-        let result = data(&b"\x0A"[..], &2u16, &InfoType::AGE);
-        assert_eq!(result, Err(Incomplete(Needed::new(1))))
-    }
-    #[test]
-    fn data_cond_shows_incomplete_when_not_enough_data_2() {
-        let result = data(&b"\x0A"[..], &6u16, &InfoType::STATS);
-        assert_eq!(result, Err(Incomplete(Needed::new(5))))
+    fn data_shows_error_when_corrupted() {
+        let result = data(&b"\x02\x50\x11\x12\x12"[..], &MessageType::REQUEST);
+        assert_eq!(
+            result,
+            Err(Error(VerboseError {
+                errors: vec![
+                    (&b"\x50\x11\x12\x12"[..], Nom(ErrorKind::Verify)),
+                    (&b"\x02\x50\x11\x12\x12"[..], Context("Request"))
+                ]
+            }))
+        )
     }
 
     #[test]

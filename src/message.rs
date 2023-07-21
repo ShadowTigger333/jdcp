@@ -4,10 +4,10 @@ use byteorder::{LittleEndian, WriteBytesExt};
 pub use data::*;
 
 #[derive(Debug, PartialEq)]
-pub struct ResponseData {
+pub struct MessageData {
     pub info_type: InfoType,
     pub data_size: u16,
-    pub data: Option<DataType>
+    pub data: Option<DataType>,
 }
 
 #[derive(Debug, PartialEq)]
