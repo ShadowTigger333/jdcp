@@ -4,6 +4,18 @@ use byteorder::{LittleEndian, WriteBytesExt};
 pub use data::*;
 
 #[derive(Debug, PartialEq)]
+pub struct ResponseData {
+    pub info_type: InfoType,
+    pub data_size: u16,
+    pub data: Option<DataType>
+}
+
+#[derive(Debug, PartialEq)]
+pub struct RequestData {
+    pub info_type: InfoType,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Message<'a> {
     pub message_type: MessageType,
     pub character_name: &'a str,

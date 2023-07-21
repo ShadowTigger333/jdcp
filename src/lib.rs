@@ -1,12 +1,13 @@
 pub mod message;
 
-use message::{DataType, InfoType, Message, MessageType};
+use message::{DataType, InfoType, Message, MessageType, ResponseData};
 use nom::{
     bytes::streaming::{is_a, tag, take},
     character::streaming::alpha1,
+    combinator::verify,
     error::{context, VerboseError, VerboseErrorKind},
     number::streaming::{le_u16, u8},
-    sequence::{preceded, terminated},
+    sequence::{preceded, terminated, tuple},
     Err::Failure,
     IResult,
 };
@@ -126,6 +127,27 @@ fn data<'a, 'b, 'c>(
     }
 }
 
+fn parse_stats_response(input: &[u8]) -> Res<&[u8], ResponseData> {
+    context(
+        "Stats Response",
+        tuple((
+            verify(info_type, |info: &InfoType| *info == InfoType::STATS),
+            verify(le_u16, |size: &u16| *size == 6),
+            data_stats,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            ResponseData {
+                info_type: response.0,
+                data_size: response.1,
+                data: response.2,
+            },
+        )
+    })
+}
+
 pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
     let (input, message_type) = message_type(input)?;
     let (input, character_name) = character_name(input)?;
@@ -133,6 +155,10 @@ pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
     let (input, data_size) = data_size(input)?;
     let (input, data) = data(input, &data_size, &info_type)?;
 
+    let i = 1;
+    if i == 2 {
+        let _ = parse_stats_response(input);
+    }
     Ok((
         input,
         Message {
@@ -151,6 +177,50 @@ mod josh_dnd_character_protocol_message_tests {
     use crate::message::StatBlock;
     use nom::Err::{Failure, Incomplete};
     use nom::Needed;
+
+    #[test]
+    fn data_type_stats_parser_works_independantly() {
+        let incoming_bytes = &b"\x01\x06\x00\x08\x0c\x13\x0e\x10\x09"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = ResponseData {
+            info_type: InfoType::STATS,
+            data_size: 6u16,
+            data: Some(DataType::STATS(StatBlock {
+                strength: 0x08,
+                dexterity: 0x0c,
+                constitution: 0x13,
+                intelligence: 0x0e,
+                wisdom: 0x10,
+                charisma: 0x09,
+            })),
+        };
+
+        assert_eq!(
+            parse_stats_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
+    }
+
+    #[test]
+    fn todo_data_type_age_parser_works_independantly() {
+        assert!(false)
+    }
+    #[test]
+    fn todo_data_type_class_parser_works_independantly() {
+        assert!(false)
+    }
+    #[test]
+    fn todo_data_type_race_parser_works_independantly() {
+        assert!(false)
+    }
+    #[test]
+    fn todo_data_type_level_parser_works_independantly() {
+        assert!(false)
+    }
+    #[test]
+    fn todo_data_type_hp_parser_works_independantly() {
+        assert!(false)
+    }
 
     #[test]
     fn message_request_level_to_bytes_works() {
