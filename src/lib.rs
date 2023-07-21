@@ -6,10 +6,9 @@ use nom::{
     bytes::streaming::{is_a, tag, take},
     character::streaming::alpha1,
     combinator::verify,
-    error::{context, VerboseError, VerboseErrorKind},
+    error::{context, VerboseError},
     number::streaming::{le_u16, u8},
     sequence::{preceded, terminated, tuple},
-    Err::Failure,
     IResult,
 };
 use std::str;
