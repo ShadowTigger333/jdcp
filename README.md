@@ -1,6 +1,6 @@
 # Josh's D&D Character Protocol (JDCP)
 
-I wanted to learn Rust with binary protocols similar to OT protocols I've worked with. The Nom crate seemed like a good place as any to start.
+I wanted to learn Rust with binary protocols similar to OT protocols I've worked with. Based on [this list of parsers](https://lib.rs/parsing), the Nom crate seemed like a good place as any to start. 
 
 ## The Protocol
 The JDCP is loosely based on CIP. Here's what it looks like broken down (I'll break it down more later):
