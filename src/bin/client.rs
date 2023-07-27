@@ -5,7 +5,7 @@ use std::{
 };
 
 use jdcp::message::{
-    data_type::{health_points::HealthPoints, DataType},
+    character_data::{health_points::HealthPoints, CharacterData},
     info_type::InfoType,
     Message, MessageType,
 };
@@ -29,7 +29,7 @@ fn main() {
                         character_name: "Bart",
                         info_type: InfoType::HP,
                         data_size: 2,
-                        data: Some(DataType::HP(HealthPoints {
+                        data: Some(CharacterData::HP(HealthPoints {
                             current: 34,
                             max: 42,
                         })),

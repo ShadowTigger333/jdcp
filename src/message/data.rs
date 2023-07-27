@@ -1,10 +1,10 @@
 pub mod data_size;
-pub mod data_type;
+pub mod character_data;
 pub mod info_type;
 
 use self::{
     data_size::parse_data_size,
-    data_type::{parse_age, parse_class, parse_hp, parse_level, parse_race, parse_stats, DataType},
+    character_data::{parse_age, parse_class, parse_hp, parse_level, parse_race, parse_stats, CharacterData},
     info_type::{parse_info_type, InfoType},
 };
 use super::MessageType;
@@ -15,14 +15,14 @@ use nom::{branch::alt, combinator::verify, error::context, sequence::tuple};
 pub struct MessageData {
     pub info_type: InfoType,
     pub data_size: u16,
-    pub data: Option<DataType>,
+    pub data: Option<CharacterData>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct RequestData {
     pub info_type: InfoType,
 }
-pub fn data<'a, 'b>(i: &'a [u8], message_type: &'b MessageType) -> Res<&'a [u8], MessageData> {
+pub fn parse_data<'a, 'b>(i: &'a [u8], message_type: &'b MessageType) -> Res<&'a [u8], MessageData> {
     if *message_type == MessageType::REQUEST {
         parse_request(i)
     } else {
@@ -186,7 +186,7 @@ pub fn parse_request(input: &[u8]) -> Res<&[u8], MessageData> {
 
 #[cfg(test)]
 mod josh_dnd_character_protocol_data_tests {
-    use crate::message::data_type::{
+    use crate::message::character_data::{
         class_type::ClassType, health_points::HealthPoints, race_kind::RaceKind,
         stat_block::StatBlock,
     };
@@ -203,7 +203,7 @@ mod josh_dnd_character_protocol_data_tests {
         let expected_result = MessageData {
             info_type: InfoType::STATS,
             data_size: 6u16,
-            data: Some(DataType::STATS(StatBlock {
+            data: Some(CharacterData::STATS(StatBlock {
                 strength: 0x08,
                 dexterity: 0x0c,
                 constitution: 0x13,
@@ -225,7 +225,7 @@ mod josh_dnd_character_protocol_data_tests {
         let expected_result = MessageData {
             info_type: InfoType::AGE,
             data_size: 2u16,
-            data: Some(DataType::AGE(0xA000)),
+            data: Some(CharacterData::AGE(0xA000)),
         };
 
         assert_eq!(
@@ -240,7 +240,7 @@ mod josh_dnd_character_protocol_data_tests {
         let expected_result = MessageData {
             info_type: InfoType::CLASS,
             data_size: 1u16,
-            data: Some(DataType::CLASS(ClassType::BARD)),
+            data: Some(CharacterData::CLASS(ClassType::BARD)),
         };
 
         assert_eq!(
@@ -255,7 +255,7 @@ mod josh_dnd_character_protocol_data_tests {
         let expected_result = MessageData {
             info_type: InfoType::RACE,
             data_size: 1u16,
-            data: Some(DataType::RACE(RaceKind::HALFELF)),
+            data: Some(CharacterData::RACE(RaceKind::HALFELF)),
         };
 
         assert_eq!(
@@ -270,7 +270,7 @@ mod josh_dnd_character_protocol_data_tests {
         let expected_result = MessageData {
             info_type: InfoType::LEVEL,
             data_size: 1u16,
-            data: Some(DataType::LEVEL(0x12)),
+            data: Some(CharacterData::LEVEL(0x12)),
         };
 
         assert_eq!(
@@ -285,7 +285,7 @@ mod josh_dnd_character_protocol_data_tests {
         let expected_result = MessageData {
             info_type: InfoType::HP,
             data_size: 2u16,
-            data: Some(DataType::HP(HealthPoints {
+            data: Some(CharacterData::HP(HealthPoints {
                 current: 0x22,
                 max: 0x25,
             })),
@@ -303,12 +303,12 @@ mod josh_dnd_character_protocol_data_tests {
             data_size: 0,
             data: None,
         };
-        let result = data(&b"\x02\x00\x00\xAA"[..], &MessageType::REQUEST);
+        let result = parse_data(&b"\x02\x00\x00\xAA"[..], &MessageType::REQUEST);
         assert_eq!(result, Ok((&b"\xAA"[..], expected_result)))
     }
     #[test]
     fn data_shows_error_when_corrupted() {
-        let result = data(&b"\x02\x50\x11\x12\x12"[..], &MessageType::REQUEST);
+        let result = parse_data(&b"\x02\x50\x11\x12\x12"[..], &MessageType::REQUEST);
         assert_eq!(
             result,
             Err(Error(VerboseError {

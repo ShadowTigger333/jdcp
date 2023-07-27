@@ -1,12 +1,14 @@
+mod character_name;
 mod data;
 mod message_type;
 
 use byteorder::{LittleEndian, WriteBytesExt};
+pub use character_name::*;
 pub use data::*;
 pub use info_type::*;
 pub use message_type::*;
 
-use self::{data::info_type::InfoType, data_type::DataType};
+use self::{character_data::CharacterData, data::info_type::InfoType};
 
 #[derive(Debug, PartialEq)]
 pub struct Message<'a> {
@@ -14,7 +16,7 @@ pub struct Message<'a> {
     pub character_name: &'a str,
     pub info_type: InfoType,
     pub data_size: u16,
-    pub data: Option<DataType>,
+    pub data: Option<CharacterData>,
 }
 
 impl Message<'_> {
@@ -28,7 +30,7 @@ impl Message<'_> {
             .write_u16::<LittleEndian>(self.data_size)
             .expect("Could not write data_size");
         let data_bytes: Vec<u8> = match &self.data {
-            Some(DataType::STATS(char_stats_block)) => [
+            Some(CharacterData::STATS(char_stats_block)) => [
                 char_stats_block.strength,
                 char_stats_block.dexterity,
                 char_stats_block.constitution,
@@ -37,16 +39,16 @@ impl Message<'_> {
                 char_stats_block.charisma,
             ]
             .to_vec(),
-            Some(DataType::AGE(char_age)) => {
+            Some(CharacterData::AGE(char_age)) => {
                 let mut age = Vec::new();
                 age.write_u16::<LittleEndian>(*char_age)
                     .expect("Age not written");
                 return age;
             }
-            Some(DataType::CLASS(char_class)) => [char_class.discriminant()].to_vec(),
-            Some(DataType::RACE(char_race)) => [char_race.discriminant()].to_vec(),
-            Some(DataType::LEVEL(char_level)) => [*char_level].to_vec(),
-            Some(DataType::HP(char_hp)) => [char_hp.current, char_hp.max].to_vec(),
+            Some(CharacterData::CLASS(char_class)) => [char_class.discriminant()].to_vec(),
+            Some(CharacterData::RACE(char_race)) => [char_race.discriminant()].to_vec(),
+            Some(CharacterData::LEVEL(char_level)) => [*char_level].to_vec(),
+            Some(CharacterData::HP(char_hp)) => [char_hp.current, char_hp.max].to_vec(),
             None => Vec::new(),
         };
 
@@ -65,12 +67,72 @@ impl Message<'_> {
 
 #[cfg(test)]
 mod tests {
-    use data::data_type::health_points::HealthPoints;
+    use data::character_data::{health_points::HealthPoints, stat_block::StatBlock};
     use nom::AsBytes;
 
     use crate::decode_jdcp;
 
     use super::*;
+
+    #[test]
+    fn message_request_level_to_bytes_works() {
+        assert_eq!(
+            &b"jdcp-\xAABart\x00\x05\x00\x00"[..],
+            Message {
+                message_type: MessageType::REQUEST,
+                character_name: "Bart",
+                info_type: InfoType::LEVEL,
+                data_size: 0,
+                data: None,
+            }
+            .encode_jdcp()
+        )
+    }
+
+    #[test]
+    fn message_request_stats_to_bytes_works() {
+        assert_eq!(
+            &b"jdcp-\xAABart\x00\x01\x00\x00"[..],
+            Message {
+                message_type: MessageType::REQUEST,
+                character_name: "Bart",
+                info_type: InfoType::STATS,
+                data_size: 0,
+                data: None,
+            }
+            .encode_jdcp()
+        )
+    }
+
+    #[test]
+    fn message_response_stats_to_bytes_works() {
+        assert_eq!(
+            &b"jdcp-\xBBBart\x00\x01\x06\x00\x0C\x12\x12\x10\x0F\x0C"[..],
+            Message {
+                message_type: MessageType::RESPONSE,
+                character_name: "Bart",
+                info_type: InfoType::STATS,
+                data_size: 6,
+                data: Some(CharacterData::STATS(StatBlock::new(12, 18, 18, 16, 15, 12))),
+            }
+            .encode_jdcp()
+        );
+    }
+
+    #[test]
+    fn message_response_level_to_bytes_works() {
+        let expected_message = Message {
+            message_type: MessageType::RESPONSE,
+            character_name: "Bart",
+            info_type: InfoType::LEVEL,
+            data_size: 1,
+            data: Some(CharacterData::LEVEL(10)),
+        };
+        assert_eq!(
+            &b"jdcp-\xBBBart\x00\x05\x01\x00\x0A"[..],
+            expected_message.encode_jdcp()
+        )
+    }
 
     #[test]
     fn back_and_forth_conversion() {
@@ -79,7 +141,7 @@ mod tests {
             character_name: "Bart",
             info_type: InfoType::HP,
             data_size: 2,
-            data: Some(DataType::HP(HealthPoints {
+            data: Some(CharacterData::HP(HealthPoints {
                 current: 34,
                 max: 42,
             })),

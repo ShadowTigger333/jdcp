@@ -1,25 +1,9 @@
 pub mod message;
 
-use message::{data, message_type, Message};
-use nom::{
-    bytes::streaming::is_a,
-    character::streaming::alpha1,
-    error::{context, VerboseError},
-    sequence::terminated,
-    IResult,
-};
-use std::str;
+use message::{parse_character_name, parse_data, parse_message_type, Message};
+use nom::{error::VerboseError, IResult};
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
-
-fn character_name(i: &[u8]) -> Res<&[u8], &str> {
-    context("character_name", terminated(alpha1, is_a(&b"\x00"[..])))(i).map(|(i, result)| {
-        (
-            i,
-            str::from_utf8(result).expect("Error reading character name"),
-        )
-    })
-}
 
 //TODO: Not sure how to cleanly throw custom errors when something doesn't parse correctly (Ex: when the alt tag fails in the data parser)
 // fn data_lenth_inconsitant_error(
@@ -34,9 +18,9 @@ fn character_name(i: &[u8]) -> Res<&[u8], &str> {
 // }
 
 pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
-    let (input, message_type) = message_type(input)?;
-    let (input, character_name) = character_name(input)?;
-    let (input, message_data) = data(input, &message_type)?;
+    let (input, message_type) = parse_message_type(input)?;
+    let (input, character_name) = parse_character_name(input)?;
+    let (input, message_data) = parse_data(input, &message_type)?;
     Ok((
         input,
         Message {
@@ -51,8 +35,8 @@ pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
 
 #[cfg(test)]
 mod josh_dnd_character_protocol_message_tests {
-    use crate::message::data_type::stat_block::StatBlock;
-    use crate::message::data_type::DataType;
+    use crate::message::character_data::stat_block::StatBlock;
+    use crate::message::character_data::CharacterData;
     use crate::message::info_type::InfoType;
     use crate::message::MessageType;
 
@@ -60,21 +44,6 @@ mod josh_dnd_character_protocol_message_tests {
     use nom::error::ErrorKind;
     use nom::error::VerboseErrorKind::{Context, Nom};
     use nom::Err::Error;
-
-    #[test]
-    fn message_request_level_to_bytes_works() {
-        assert_eq!(
-            &b"jdcp-\xAABart\x00\x05\x00\x00"[..],
-            Message {
-                message_type: MessageType::REQUEST,
-                character_name: "Bart",
-                info_type: InfoType::LEVEL,
-                data_size: 0,
-                data: None,
-            }
-            .encode_jdcp()
-        )
-    }
 
     #[test]
     fn bytes_to_message_request_level_works() {
@@ -111,21 +80,6 @@ mod josh_dnd_character_protocol_message_tests {
     }
 
     #[test]
-    fn message_request_stats_to_bytes_works() {
-        assert_eq!(
-            &b"jdcp-\xAABart\x00\x01\x00\x00"[..],
-            Message {
-                message_type: MessageType::REQUEST,
-                character_name: "Bart",
-                info_type: InfoType::STATS,
-                data_size: 0,
-                data: None,
-            }
-            .encode_jdcp()
-        )
-    }
-
-    #[test]
     fn bytes_to_message_response_stats_works() {
         assert_eq!(
             decode_jdcp(&b"jdcp-\xBBBart\x00\x01\x06\x00\x0C\x12\x12\x10\x0F\x0C"[..]),
@@ -136,7 +90,7 @@ mod josh_dnd_character_protocol_message_tests {
                     character_name: "Bart",
                     info_type: InfoType::STATS,
                     data_size: 6,
-                    data: Some(DataType::STATS(StatBlock::new(12, 18, 18, 16, 15, 12))),
+                    data: Some(CharacterData::STATS(StatBlock::new(12, 18, 18, 16, 15, 12))),
                 }
             ))
         );
@@ -170,55 +124,18 @@ mod josh_dnd_character_protocol_message_tests {
     }
 
     #[test]
-    fn message_response_stats_to_bytes_works() {
-        assert_eq!(
-            &b"jdcp-\xBBBart\x00\x01\x06\x00\x0C\x12\x12\x10\x0F\x0C"[..],
-            Message {
-                message_type: MessageType::RESPONSE,
-                character_name: "Bart",
-                info_type: InfoType::STATS,
-                data_size: 6,
-                data: Some(DataType::STATS(StatBlock::new(12, 18, 18, 16, 15, 12))),
-            }
-            .encode_jdcp()
-        );
-    }
-
-    #[test]
     fn bytes_to_message_response_level_works() {
         let expected_message = Message {
             message_type: MessageType::RESPONSE,
             character_name: "Bart",
             info_type: InfoType::LEVEL,
             data_size: 1,
-            data: Some(DataType::LEVEL(10)),
+            data: Some(CharacterData::LEVEL(10)),
         };
         assert_eq!(
             decode_jdcp(&b"jdcp-\xBBBart\x00\x05\x01\x00\x0A"[..]),
             Ok((&b""[..], expected_message))
         );
-    }
-
-    #[test]
-    fn message_response_level_to_bytes_works() {
-        let expected_message = Message {
-            message_type: MessageType::RESPONSE,
-            character_name: "Bart",
-            info_type: InfoType::LEVEL,
-            data_size: 1,
-            data: Some(DataType::LEVEL(10)),
-        };
-        assert_eq!(
-            &b"jdcp-\xBBBart\x00\x05\x01\x00\x0A"[..],
-            expected_message.encode_jdcp()
-        )
-    }
-
-
-    #[test]
-    fn character_name_bytes_returns_actual_name() {
-        let result = character_name(&b"\x42\x61\x72\x74\x00\x01"[..]);
-        assert_eq!(result, Ok((&b"\x01"[..], "Bart")));
     }
 
     #[test]
