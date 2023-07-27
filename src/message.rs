@@ -1,19 +1,12 @@
 mod data;
+mod message_type;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 pub use data::*;
+pub use info_type::*;
+pub use message_type::*;
 
-#[derive(Debug, PartialEq)]
-pub struct MessageData {
-    pub info_type: InfoType,
-    pub data_size: u16,
-    pub data: Option<DataType>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RequestData {
-    pub info_type: InfoType,
-}
+use self::{data::info_type::InfoType, data_type::DataType};
 
 #[derive(Debug, PartialEq)]
 pub struct Message<'a> {
@@ -70,62 +63,9 @@ impl Message<'_> {
     }
 }
 
-#[derive(Debug, PartialEq)]
-#[repr(u8)]
-pub enum MessageType {
-    REQUEST = 0xAA,
-    RESPONSE = 0xBB,
-}
-
-impl MessageType {
-    fn discriminant(&self) -> u8 {
-        unsafe { *(self as *const Self as *const u8) }
-    }
-}
-
-impl From<&[u8]> for MessageType {
-    fn from(value: &[u8]) -> Self {
-        match value.first() {
-            Some(0xAA) => MessageType::REQUEST,
-            Some(0xBB) => MessageType::RESPONSE,
-            _ => unimplemented!("No other messages currently"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-#[repr(u8)]
-pub enum InfoType {
-    STATS = 1,
-    AGE = 2,
-    CLASS = 3,
-    RACE = 4,
-    LEVEL = 5,
-    HP = 6,
-}
-
-impl InfoType {
-    fn discriminant(&self) -> u8 {
-        unsafe { *(self as *const Self as *const u8) }
-    }
-}
-
-impl From<&[u8]> for InfoType {
-    fn from(value: &[u8]) -> Self {
-        match value.first() {
-            Some(1) => InfoType::STATS,
-            Some(2) => InfoType::AGE,
-            Some(3) => InfoType::CLASS,
-            Some(4) => InfoType::RACE,
-            Some(5) => InfoType::LEVEL,
-            Some(6) => InfoType::HP,
-            _ => unimplemented!("No other info_types currently"),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use data::data_type::health_points::HealthPoints;
     use nom::AsBytes;
 
     use crate::decode_jdcp;

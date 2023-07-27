@@ -1,8 +1,13 @@
-use jdcp::message::{DataType, HealthPoints, InfoType, Message, MessageType};
 use std::{
     io::{stdin, Read, Write},
     net::TcpStream,
     str::from_utf8,
+};
+
+use jdcp::message::{
+    data_type::{health_points::HealthPoints, DataType},
+    info_type::InfoType,
+    Message, MessageType,
 };
 
 fn main() {

@@ -1,142 +1,322 @@
-#[derive(Debug, PartialEq)]
-pub enum DataType {
-    STATS(StatBlock),
-    AGE(u16),
-    CLASS(ClassType),
-    RACE(RaceKind),
-    LEVEL(u8),
-    HP(HealthPoints),
-}
+pub mod data_size;
+pub mod data_type;
+pub mod info_type;
+
+use self::{
+    data_size::parse_data_size,
+    data_type::{parse_age, parse_class, parse_hp, parse_level, parse_race, parse_stats, DataType},
+    info_type::{parse_info_type, InfoType},
+};
+use super::MessageType;
+use crate::Res;
+use nom::{branch::alt, combinator::verify, error::context, sequence::tuple};
 
 #[derive(Debug, PartialEq)]
-pub struct StatBlock {
-    pub strength: u8,
-    pub dexterity: u8,
-    pub constitution: u8,
-    pub intelligence: u8,
-    pub wisdom: u8,
-    pub charisma: u8,
-}
-
-impl From<&[u8]> for StatBlock {
-    fn from(value: &[u8]) -> Self {
-        StatBlock {
-            strength: value[0],
-            dexterity: value[1],
-            constitution: value[2],
-            intelligence: value[3],
-            wisdom: value[4],
-            charisma: value[5],
-        }
-    }
-}
-
-impl StatBlock {
-    pub fn new(str: u8, dex: u8, con: u8, int: u8, wis: u8, chr: u8) -> Self {
-        StatBlock {
-            strength: str,
-            dexterity: dex,
-            constitution: con,
-            intelligence: int,
-            wisdom: wis,
-            charisma: chr,
-        }
-    }
+pub struct MessageData {
+    pub info_type: InfoType,
+    pub data_size: u16,
+    pub data: Option<DataType>,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ClassType {
-    ARTIFACER = 1,
-    BARBARIAN = 2,
-    BARD = 3,
-    BLOODHUNTER = 4,
-    CLERIC = 5,
-    DRUID = 6,
-    FIGHTER = 7,
-    MONK = 8,
-    PALADIN = 9,
-    RANGER = 10,
-    ROGUE = 11,
-    SORCERER = 12,
-    WARLOCK = 13,
-    WIZARD = 14,
+pub struct RequestData {
+    pub info_type: InfoType,
 }
-
-impl From<&[u8]> for ClassType {
-    fn from(value: &[u8]) -> Self {
-        match value.first() {
-            Some(1) => ClassType::ARTIFACER,
-            Some(2) => ClassType::BARBARIAN,
-            Some(3) => ClassType::BARD,
-            Some(4) => ClassType::BLOODHUNTER,
-            Some(5) => ClassType::CLERIC,
-            Some(6) => ClassType::DRUID,
-            Some(7) => ClassType::FIGHTER,
-            Some(8) => ClassType::MONK,
-            Some(9) => ClassType::PALADIN,
-            Some(10) => ClassType::RANGER,
-            Some(11) => ClassType::ROGUE,
-            Some(12) => ClassType::SORCERER,
-            Some(13) => ClassType::WARLOCK,
-            Some(14) => ClassType::WIZARD,
-            _ => unimplemented!("No other classes currently"),
-        }
+pub fn data<'a, 'b>(i: &'a [u8], message_type: &'b MessageType) -> Res<&'a [u8], MessageData> {
+    if *message_type == MessageType::REQUEST {
+        parse_request(i)
+    } else {
+        context(
+            "Parse Response",
+            alt((
+                parse_stats_response,
+                parse_age_response,
+                parse_class_response,
+                parse_race_response,
+                parse_level_response,
+                parse_hp_response,
+            )),
+        )(i)
     }
 }
+pub fn parse_stats_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Stats Response",
+        tuple((
+            verify(parse_info_type, |info: &InfoType| *info == InfoType::STATS),
+            verify(parse_data_size, |size: &u16| *size == 6),
+            parse_stats,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: Some(response.2),
+            },
+        )
+    })
+}
 
-impl ClassType {
-    pub fn discriminant(&self) -> u8 {
-        unsafe { *(self as *const Self as *const u8) }
+pub fn parse_age_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Age Response",
+        tuple((
+            verify(parse_info_type, |info: &InfoType| *info == InfoType::AGE),
+            verify(parse_data_size, |size: &u16| *size == 2),
+            parse_age,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: Some(response.2),
+            },
+        )
+    })
+}
+
+pub fn parse_class_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Class Response",
+        tuple((
+            verify(parse_info_type, |info: &InfoType| *info == InfoType::CLASS),
+            verify(parse_data_size, |size: &u16| *size == 1),
+            parse_class,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: Some(response.2),
+            },
+        )
+    })
+}
+
+pub fn parse_race_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Race Response",
+        tuple((
+            verify(parse_info_type, |info: &InfoType| *info == InfoType::RACE),
+            verify(parse_data_size, |size: &u16| *size == 1),
+            parse_race,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: Some(response.2),
+            },
+        )
+    })
+}
+
+pub fn parse_level_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Level Response",
+        tuple((
+            verify(parse_info_type, |info: &InfoType| *info == InfoType::LEVEL),
+            verify(parse_data_size, |size: &u16| *size == 1),
+            parse_level,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: Some(response.2),
+            },
+        )
+    })
+}
+fn parse_hp_response(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "HP Response",
+        tuple((
+            verify(parse_info_type, |info: &InfoType| *info == InfoType::HP),
+            verify(parse_data_size, |size: &u16| *size == 2),
+            parse_hp,
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: Some(response.2),
+            },
+        )
+    })
+}
+
+pub fn parse_request(input: &[u8]) -> Res<&[u8], MessageData> {
+    context(
+        "Request",
+        tuple((
+            parse_info_type,
+            verify(parse_data_size, |size: &u16| *size == 0),
+        )),
+    )(input)
+    .map(|(input, response)| {
+        (
+            input,
+            MessageData {
+                info_type: response.0,
+                data_size: response.1,
+                data: None,
+            },
+        )
+    })
+}
+
+#[cfg(test)]
+mod josh_dnd_character_protocol_data_tests {
+    use crate::message::data_type::{
+        class_type::ClassType, health_points::HealthPoints, race_kind::RaceKind,
+        stat_block::StatBlock,
+    };
+    use nom::error::VerboseErrorKind::{Context, Nom};
+    use nom::error::{ErrorKind, VerboseError};
+    use nom::Err::Error;
+
+    use super::*;
+
+    #[test]
+    fn data_type_stats_parser_works_independantly() {
+        let incoming_bytes = &b"\x01\x06\x00\x08\x0c\x13\x0e\x10\x09"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::STATS,
+            data_size: 6u16,
+            data: Some(DataType::STATS(StatBlock {
+                strength: 0x08,
+                dexterity: 0x0c,
+                constitution: 0x13,
+                intelligence: 0x0e,
+                wisdom: 0x10,
+                charisma: 0x09,
+            })),
+        };
+
+        assert_eq!(
+            parse_stats_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
     }
-}
+    #[test]
+    fn data_type_age_parser_works_independantly() {
+        let incoming_bytes = &b"\x02\x02\x00\x00\xA0"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::AGE,
+            data_size: 2u16,
+            data: Some(DataType::AGE(0xA000)),
+        };
 
-#[derive(Debug, PartialEq)]
-pub enum RaceKind {
-    DWARF = 1,
-    ELF = 2,
-    GNOME = 3,
-    HALFELF = 4,
-    HALFLING = 5,
-    HALFORK = 6,
-    HUMAN = 7,
-    ORC = 8,
-    TIEFLING = 9,
-}
-
-impl From<&[u8]> for RaceKind {
-    fn from(value: &[u8]) -> Self {
-        match value.first() {
-            Some(1) => RaceKind::DWARF,
-            Some(2) => RaceKind::ELF,
-            Some(3) => RaceKind::GNOME,
-            Some(4) => RaceKind::HALFELF,
-            Some(5) => RaceKind::HALFLING,
-            Some(6) => RaceKind::HALFORK,
-            Some(7) => RaceKind::HUMAN,
-            Some(8) => RaceKind::ORC,
-            Some(9) => RaceKind::TIEFLING,
-            _ => unimplemented!("No other races currently"),
-        }
+        assert_eq!(
+            parse_age_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
     }
-}
+    #[test]
+    fn data_type_class_parser_works_independantly() {
+        let incoming_bytes = &b"\x03\x01\x00\x03"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::CLASS,
+            data_size: 1u16,
+            data: Some(DataType::CLASS(ClassType::BARD)),
+        };
 
-impl RaceKind {
-    pub fn discriminant(&self) -> u8 {
-        unsafe { *(self as *const Self as *const u8) }
+        assert_eq!(
+            parse_class_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
     }
-}
+    #[test]
+    fn data_type_race_parser_works_independantly() {
+        let incoming_bytes = &b"\x04\x01\x00\x04"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::RACE,
+            data_size: 1u16,
+            data: Some(DataType::RACE(RaceKind::HALFELF)),
+        };
 
-#[derive(Debug, PartialEq)]
-pub struct HealthPoints {
-    pub current: u8,
-    pub max: u8,
-}
+        assert_eq!(
+            parse_race_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
+    }
+    #[test]
+    fn data_type_level_parser_works_independantly() {
+        let incoming_bytes = &b"\x05\x01\x00\x12"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::LEVEL,
+            data_size: 1u16,
+            data: Some(DataType::LEVEL(0x12)),
+        };
 
-impl From<&[u8]> for HealthPoints {
-    fn from(value: &[u8]) -> Self {
-        HealthPoints {
-            current: value[0],
-            max: value[1],
-        }
+        assert_eq!(
+            parse_level_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
+    }
+    #[test]
+    fn data_type_hp_parser_works_independantly() {
+        let incoming_bytes = &b"\x06\x02\x00\x22\x25"[..];
+        let expected_remainder = &b""[..];
+        let expected_result = MessageData {
+            info_type: InfoType::HP,
+            data_size: 2u16,
+            data: Some(DataType::HP(HealthPoints {
+                current: 0x22,
+                max: 0x25,
+            })),
+        };
+
+        assert_eq!(
+            parse_hp_response(incoming_bytes),
+            Ok((expected_remainder, expected_result))
+        );
+    }
+    #[test]
+    fn data_request_works() {
+        let expected_result = MessageData {
+            info_type: InfoType::AGE,
+            data_size: 0,
+            data: None,
+        };
+        let result = data(&b"\x02\x00\x00\xAA"[..], &MessageType::REQUEST);
+        assert_eq!(result, Ok((&b"\xAA"[..], expected_result)))
+    }
+    #[test]
+    fn data_shows_error_when_corrupted() {
+        let result = data(&b"\x02\x50\x11\x12\x12"[..], &MessageType::REQUEST);
+        assert_eq!(
+            result,
+            Err(Error(VerboseError {
+                errors: vec![
+                    (&b"\x50\x11\x12\x12"[..], Nom(ErrorKind::Verify)),
+                    (&b"\x02\x50\x11\x12\x12"[..], Context("Request"))
+                ]
+            }))
+        )
     }
 }
