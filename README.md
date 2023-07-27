@@ -27,8 +27,7 @@ cargo run --bin client
 
 
 ### TODO
-1. Impl Parser for each component part
-2. Mod out each field into their own file
-3. Add separate character object
-4. Add doc comments
-5. Add new field for arbitrary length "description"
+1. Mod out each field into their own file
+1. Add a separate character object
+1. Add doc comments
+1. Add a new field for arbitrary length "description"
