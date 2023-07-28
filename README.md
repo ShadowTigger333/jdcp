@@ -8,6 +8,34 @@ Protocol Preamble | Message Type | Character Name | Info Type | Data Size | Data
 ---|---|---|---|---|---
 "jdcp-" | 1 u8 | \x00 ended ascii string | 1 u8 | 1u16 (LE) | Data... 
 
+Here's the data field broken down a little
+Data Type | Bytes | Struct
+---|---|---
+Stats | 6u8 | Stats(str, dex, con, wis, int, cha)
+Age | 1u16 (LE) | 0 - 65535
+Class | 1u8  | Class Enum
+Race | 1u8 | Race Enum
+Level | 1u8 | 0 - 255
+Health Points | 2u8 | HP(current, max)
+
+Class and Race Enum Values:
+Class | Value | Race
+---|---|---
+ARTIFICER | 1 | DWARF
+BARBARIAN | 2 | ELF
+BARD | 3 | GNOME
+BLOODHUNTER | 4 | HALFELF
+CLERIC | 5 | HALFLING
+DRUID | 6 | HALFORC
+FIGHTER | 7 | HUMAN
+MONK | 8 | ORC
+PALADIN | 9 | TIEFLING
+RANGER | 10 |
+ROGUE | 11 |
+SORCERER | 12 |
+WARLOCK | 13 |
+WIZARD | 14 |
+
 ## Notes
 I'm trying to learn a lot and jumping back and forth diving into the "Rustian" ways of TDD, abstraction, and error handling while also learning about lifetimes, streaming data, and ownership.
 
