@@ -1,6 +1,6 @@
 #[derive(Debug, PartialEq)]
 pub enum ClassType {
-    ARTIFACER = 1,
+    ARTIFICER = 1,
     BARBARIAN = 2,
     BARD = 3,
     BLOODHUNTER = 4,
@@ -19,7 +19,7 @@ pub enum ClassType {
 impl From<&[u8]> for ClassType {
     fn from(value: &[u8]) -> Self {
         match value.first() {
-            Some(1) => ClassType::ARTIFACER,
+            Some(1) => ClassType::ARTIFICER,
             Some(2) => ClassType::BARBARIAN,
             Some(3) => ClassType::BARD,
             Some(4) => ClassType::BLOODHUNTER,
