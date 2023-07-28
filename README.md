@@ -1,4 +1,5 @@
 # Josh's D&D Character Protocol (JDCP)
+[![Rust](https://github.com/ShadowTigger333/jdcp/actions/workflows/rust.yml/badge.svg)](https://github.com/ShadowTigger333/jdcp/actions/workflows/rust.yml)
 
 I wanted to learn Rust with binary protocols similar to OT protocols I've worked with. Based on [this list of parsers](https://lib.rs/parsing), the Nom crate seemed like a good place as any to start. 
 
