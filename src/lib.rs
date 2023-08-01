@@ -1,5 +1,5 @@
+pub mod character;
 pub mod message;
-
 use message::{parse_character_name, parse_data, parse_message_type, Message};
 use nom::{error::VerboseError, IResult};
 
@@ -35,8 +35,8 @@ pub fn decode_jdcp(input: &[u8]) -> Res<&[u8], Message> {
 
 #[cfg(test)]
 mod josh_dnd_character_protocol_message_tests {
-    use crate::message::character_data::stat_block::StatBlock;
-    use crate::message::character_data::CharacterData;
+    use crate::character::character_data::stat_block::StatBlock;
+    use crate::character::character_data::CharacterData;
     use crate::message::info_type::InfoType;
     use crate::message::MessageType;
 

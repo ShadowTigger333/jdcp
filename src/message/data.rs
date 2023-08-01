@@ -1,14 +1,14 @@
-pub mod data_size;
 pub mod character_data;
+pub mod data_size;
 pub mod info_type;
 
 use self::{
+    character_data::{parse_age, parse_class, parse_hp, parse_level, parse_race, parse_stats},
     data_size::parse_data_size,
-    character_data::{parse_age, parse_class, parse_hp, parse_level, parse_race, parse_stats, CharacterData},
     info_type::{parse_info_type, InfoType},
 };
 use super::MessageType;
-use crate::Res;
+use crate::{character::character_data::CharacterData, Res};
 use nom::{branch::alt, combinator::verify, error::context, sequence::tuple};
 
 #[derive(Debug, PartialEq)]
@@ -22,7 +22,10 @@ pub struct MessageData {
 pub struct RequestData {
     pub info_type: InfoType,
 }
-pub fn parse_data<'a, 'b>(i: &'a [u8], message_type: &'b MessageType) -> Res<&'a [u8], MessageData> {
+pub fn parse_data<'a, 'b>(
+    i: &'a [u8],
+    message_type: &'b MessageType,
+) -> Res<&'a [u8], MessageData> {
     if *message_type == MessageType::REQUEST {
         parse_request(i)
     } else {
@@ -186,7 +189,7 @@ pub fn parse_request(input: &[u8]) -> Res<&[u8], MessageData> {
 
 #[cfg(test)]
 mod josh_dnd_character_protocol_data_tests {
-    use crate::message::character_data::{
+    use crate::character::character_data::{
         class_type::ClassType, health_points::HealthPoints, race_kind::RaceKind,
         stat_block::StatBlock,
     };

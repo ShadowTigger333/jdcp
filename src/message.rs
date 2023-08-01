@@ -8,7 +8,9 @@ pub use data::*;
 pub use info_type::*;
 pub use message_type::*;
 
-use self::{character_data::CharacterData, data::info_type::InfoType};
+use crate::character::character_data::CharacterData;
+
+use self::data::info_type::InfoType;
 
 #[derive(Debug, PartialEq)]
 pub struct Message<'a> {
@@ -67,12 +69,12 @@ impl Message<'_> {
 
 #[cfg(test)]
 mod tests {
-    use data::character_data::{health_points::HealthPoints, stat_block::StatBlock};
-    use nom::AsBytes;
-
-    use crate::decode_jdcp;
-
     use super::*;
+    use crate::{
+        character::character_data::{health_points::HealthPoints, stat_block::StatBlock},
+        decode_jdcp,
+    };
+    use nom::AsBytes;
 
     #[test]
     fn message_request_level_to_bytes_works() {

@@ -4,10 +4,9 @@ use std::{
     str::from_utf8,
 };
 
-use jdcp::message::{
-    character_data::{health_points::HealthPoints, CharacterData},
-    info_type::InfoType,
-    Message, MessageType,
+use jdcp::{
+    character::character_data::{health_points::HealthPoints, CharacterData},
+    message::{info_type::InfoType, Message, MessageType},
 };
 
 fn main() {
