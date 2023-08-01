@@ -56,6 +56,5 @@ cargo run --bin client
 
 
 ### TODO
-1. Add a separate character object
 1. Add doc comments
-1. Add a new field for arbitrary length "description"
+1. Add a new parser for arbitrary length "description"
